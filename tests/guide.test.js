@@ -91,3 +91,12 @@ test('pronom « en » : quantité ou préposition « de »', () => {
   assert.equal(conclut("J'en fais.", [1], [2], [0], ['quantite']), 'COD');
   assert.equal(conclut("J'en parle.", [1], [2], [0], ['de']), 'COI');
 });
+
+test('adverbe détaché : circonstance, modalisateur ou connecteur', () => {
+  const p = "J'en fais, précisément, pour m'entraîner.";
+  assert.equal(conclut(p, [4], [2], [0], ['oui', 'oui', 'lien']), 'CONN');
+  assert.equal(conclut('Heureusement, il est venu.', [0], [3, 4], [2], ['oui', 'oui', 'avis']), 'MOD');
+  assert.equal(conclut('Hier, il est venu.', [0], [3, 4], [2], ['oui', 'oui', 'circonstance', 'temps']), 'CC');
+  // Un groupe qui ne répond à aucune question de circonstance
+  assert.equal(conclut('Selon les journalistes, la réunion est annulée.', [0, 1, 2], [6, 7], [4, 5], ['oui', 'oui', 'aucune', 'avis']), 'MOD');
+});

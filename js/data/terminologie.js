@@ -68,6 +68,16 @@ export const FONCTIONS = {
     nom: "Complément de l'adjectif", court: "Compl. de l'adjectif", abrege: 'Compl. adj.', niveau: 'c4', place: 'groupe', couleur: 'expansion',
     definition: "Le complément de l'adjectif complète un adjectif ; il est introduit par une préposition : « fier de son travail ».",
   },
+  // Fonctions énonciatives et textuelles (terminologie II.2.7) : pas de
+  // fonction syntaxique dans la phrase. Utilisées par le guide du mode libre.
+  MOD: {
+    nom: 'Modalisateur', court: 'Modalisateur', abrege: 'Modalis.', niveau: 'c4', place: 'enonciation', couleur: 'enonciation',
+    definition: 'Un modalisateur exprime l’avis ou le degré de certitude de celui qui parle (heureusement, peut-être, sans doute, franchement). Il commente la phrase et n’y a pas de fonction.',
+  },
+  CONN: {
+    nom: 'Connecteur', court: 'Connecteur', abrege: 'Connect.', niveau: 'c4', place: 'enonciation', couleur: 'enonciation',
+    definition: 'Un connecteur relie la phrase à ce qui a été dit avant (pourtant, justement, d’ailleurs, en effet). Il n’a pas de fonction dans la phrase.',
+  },
 };
 
 // Sens des compléments circonstanciels (« CC:temps » dans la notation).

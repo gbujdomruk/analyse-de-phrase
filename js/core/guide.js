@@ -194,12 +194,40 @@ export function questionSuivante(ctx, chemin) {
     return {
       id: 'deplace',
       titre: 'Test de déplacement',
-      texte: 'Voici la phrase avec le groupe déplacé en tête. Est-elle correcte ?',
+      texte: 'Voici la phrase avec le groupe déplacé en tête. Est-elle correcte, et dit-elle la même chose que ta phrase ?',
       exemple: M.deplaceEnTete(jetons, groupe),
       reponses: [{ id: 'oui', texte: 'Oui' }, { id: 'non', texte: 'Non' }],
     };
   }
   if (r.supprime === 'oui' && r.deplace === 'oui') {
+    // Un adverbe détachable n'est pas forcément un complément circonstanciel :
+    // il peut commenter la phrase (heureusement) ou la relier à ce qui
+    // précède (justement, pourtant). Terminologie 2020, II.2.7 et II.3.5.
+    const adverbe = seul && naturesPossibles(premier.texte).includes('adv');
+    if ((adverbe || r.circonstance === 'aucune') && !('role' in r)) {
+      return {
+        id: 'role',
+        titre: 'Circonstance, avis ou lien ?',
+        texte: `Que fait ${cite(jetons, groupe)} dans ta phrase ?`,
+        reponses: [
+          { id: 'circonstance', texte: 'Il indique une circonstance : quand ? où ? comment ? pourquoi ?…' },
+          { id: 'avis', texte: 'Il donne l’avis de celui qui parle ou son degré de certitude (heureusement, peut-être, sans doute, franchement…)' },
+          { id: 'lien', texte: 'Il relie la phrase à ce qui a été dit avant (justement, pourtant, d’ailleurs, en effet…)' },
+        ],
+      };
+    }
+    if (r.role === 'avis') {
+      return conclusion('MOD', 'modalisateur (fonction énonciative)', [
+        'Le mot ne donne pas une circonstance : il exprime l’avis ou la certitude de celui qui parle.',
+        'Ce n’est pas une fonction dans la phrase mais un commentaire sur la phrase : « Bizarrement, elle a agi » = « elle a agi, et je trouve cela bizarre ».',
+      ]);
+    }
+    if (r.role === 'lien') {
+      return conclusion('CONN', 'connecteur (fonction textuelle)', [
+        'Le mot ne donne pas une circonstance : il relie la phrase à ce qui a été dit avant, comme une conjonction de coordination.',
+        'Il n’a donc pas de fonction dans la phrase elle-même.',
+      ]);
+    }
     if (!('circonstance' in r)) {
       return {
         id: 'circonstance',
@@ -207,14 +235,14 @@ export function questionSuivante(ctx, chemin) {
         texte: 'Le groupe peut être supprimé et déplacé : c’est un complément circonstanciel. À quelle question répond-il ?',
         reponses: Object.entries(CIRCONSTANCES).filter(([, c]) => auNiveau(c.niveau, ctx.niveau))
           .map(([id, c]) => ({ id, texte: `${c.question} (${c.nom})` }))
-          .concat([{ id: 'autre', texte: 'Je ne sais pas' }]),
+          .concat([{ id: 'aucune', texte: 'À aucune de ces questions' }]),
       };
     }
     const circ = CIRCONSTANCES[r.circonstance];
     return conclusion('CC', circ ? `complément circonstanciel de ${circ.nom}` : 'complément circonstanciel', [
       'On peut le supprimer : il n’est pas indispensable.',
       'On peut le déplacer : il n’est pas lié au verbe.',
-    ], r.circonstance !== 'autre' ? r.circonstance : null);
+    ], circ ? r.circonstance : null);
   }
   if (r.supprime === 'oui' && r.deplace === 'non') {
     // Cas intermédiaire : on demande si le groupe est impliqué par le verbe.
