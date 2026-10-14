@@ -100,3 +100,25 @@ test('adverbe détaché : circonstance, modalisateur ou connecteur', () => {
   // Un groupe qui ne répond à aucune question de circonstance
   assert.equal(conclut('Selon les journalistes, la réunion est annulée.', [0, 1, 2], [6, 7], [4, 5], ['oui', 'oui', 'aucune', 'avis']), 'MOD');
 });
+
+test('sélection : mot-outil seul ou groupe incomplet', () => {
+  const j = D("J'en fais, précisément, pour m'entraîner, mais là, je suis totalement égarée");
+  const pour = G.verifieSelection(j, [6]);
+  assert.match(pour.message, /préposition/);
+  assert.deepEqual(pour.suggestion, [6, 7, 8]);
+  assert.match(G.verifieSelection(j, [10]).message, /coordination/);
+  assert.deepEqual(G.verifieSelection(j, [7, 8]).suggestion, [6, 7, 8]);
+  assert.equal(G.verifieSelection(j, [6, 7, 8]), null);
+  const k = D('Le chat de la voisine dort sur le canapé.');
+  assert.deepEqual(G.verifieSelection(k, [7], new Set([5])).suggestion, [7, 8]);
+  assert.deepEqual(G.verifieSelection(k, [6, 7], new Set([5])).suggestion, [6, 7, 8]);
+  assert.match(G.verifieSelection(k, [6, 8]).message, /seul tenant/);
+  assert.equal(G.verifieSelection(k, [6, 7, 8]), null);
+});
+
+test('« en » : pronom devant un verbe, préposition devant un nom', () => {
+  const j = D("J'en fais en hiver.");
+  assert.equal(G.candidatsNature(j, { jetons: [1], locution: null }).probable, 'pro.adv');
+  assert.equal(G.candidatsNature(j, { jetons: [3], locution: null }).probable, 'prep');
+  assert.equal(G.verifieSelection(j, [1]), null);
+});

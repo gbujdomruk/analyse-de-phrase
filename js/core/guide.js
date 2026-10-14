@@ -121,6 +121,86 @@ export function remarquesVerbes(jetons, selection) {
   return remarques;
 }
 
+// --- Vérification de la sélection avant les tests ----------------------------------
+
+// Mots-outils qui n'ont pas de fonction par eux-mêmes (terminologie I.1.6).
+const SANS_FONCTION = (n) => n === 'prep' || n.startsWith('det') || n === 'conj.coord' || n === 'conj.sub';
+// « le » peut être déterminant ou pronom : on suit l'indice de contexte
+// (suivi d'un nom → déterminant).
+function natureProbable(jetons, j) {
+  const n = naturesPossibles(j.texte, { debutDePhrase: j.i === 0 });
+  if (n.length > 1 && !n.every(SANS_FONCTION)) return candidatsNature(jetons, { jetons: [j.i], locution: null }).probable;
+  return n[0];
+}
+const natureOutil = (jetons, j) => {
+  const n = natureProbable(jetons, j);
+  return n && SANS_FONCTION(n) ? n : null;
+};
+
+// Les tests de suppression et de déplacement n'ont de sens que sur un groupe
+// entier. Renvoie null si la sélection convient, sinon une explication et,
+// si possible, le groupe que l'élève voulait sans doute sélectionner.
+// `interdits` : mots déjà analysés (verbe, sujet, autres groupes).
+export function verifieSelection(jetons, groupe, interdits = new Set()) {
+  const ind = [...groupe].filter((i) => !jetons[i].ponct).sort((a, b) => a - b);
+  if (!ind.length) return null;
+  const premier = jetons[ind[0]];
+  const dernier = jetons[ind.at(-1)];
+  const trous = jetons.slice(ind[0], ind.at(-1) + 1).filter((j) => !j.ponct && !ind.includes(j.i));
+  if (trous.length) {
+    return { message: `Ta sélection n’est pas d’un seul tenant (il manque ${trous.map((j) => `« ${j.texte} »`).join(', ')}) : un groupe est formé de mots qui se suivent.`, suggestion: null };
+  }
+  const mot = normalise(premier.texte);
+  if (ind.length === 1 && NEGATION.has(mot)) {
+    return { message: `« ${premier.texte} » sert à la négation : il n’a pas de fonction. Tu n’as pas besoin de l’analyser.`, suggestion: null };
+  }
+  if (ind.length === 1 && natureOutil(jetons, premier)) {
+    const n = natureOutil(jetons, premier);
+    if (n === 'conj.coord') {
+      return { message: `« ${premier.texte} » est une conjonction de coordination : elle relie deux groupes ou deux propositions et n’a pas de fonction. Tu n’as pas besoin de l’analyser.`, suggestion: null };
+    }
+    if (n === 'conj.sub') {
+      return { message: `« ${premier.texte} » est une conjonction de subordination : seule, elle n’a pas de fonction. Elle introduit une proposition subordonnée : sélectionne toute la subordonnée pour trouver sa fonction.`, suggestion: null };
+    }
+    const suggestion = etend(jetons, ind[0], interdits, n);
+    const quoi = n === 'prep' ? 'une préposition' : 'un déterminant';
+    const role = n === 'prep' ? 'Elle introduit un groupe' : 'Il introduit un nom';
+    return {
+      message: `« ${premier.texte} » est ${quoi} : seul, ce mot n’a pas de fonction. ${role}, et c’est ce groupe entier qui a une fonction.`,
+      suggestion: suggestion.length > 1 ? suggestion : null,
+    };
+  }
+  if (ind.length > 1 && natureOutil(jetons, dernier)) {
+    const suite = etend(jetons, dernier.i, interdits, natureOutil(jetons, dernier));
+    return {
+      message: `Ton groupe se termine par « ${dernier.texte} », qui annonce un mot ou un groupe : il est incomplet.`,
+      suggestion: suite.length > 1 ? [...ind, ...suite.slice(1)] : null,
+    };
+  }
+  // Groupe qui commence juste après une préposition : « dans [le jardin] ».
+  const avant = jetons[ind[0] - 1];
+  if (avant && !avant.ponct && !interdits.has(avant.i) && natureProbable(jetons, avant) === 'prep') {
+    return {
+      message: `Juste avant ton groupe, il y a la préposition « ${avant.texte} ». Un complément introduit par une préposition la contient : le groupe commence sans doute par « ${avant.texte} ».`,
+      suggestion: [avant.i, ...ind],
+    };
+  }
+  return null;
+}
+
+// Prolonge une sélection à partir d'une préposition (jusqu'à la ponctuation,
+// une conjonction de coordination ou un mot déjà analysé) ou d'un déterminant
+// (jusqu'au nom).
+function etend(jetons, debut, interdits, nature) {
+  const groupe = [debut];
+  for (const j of jetons.slice(debut + 1)) {
+    if (j.ponct || interdits.has(j.i) || naturesPossibles(j.texte).every((n) => n === 'conj.coord')) break;
+    groupe.push(j.i);
+    if (nature !== 'prep' && naturesPossibles(j.texte).some((n) => n.startsWith('nom'))) break;
+  }
+  return groupe;
+}
+
 // --- Sujet et accord ------------------------------------------------------------
 
 // Personnes et nombres possibles pour un sujet (« le chat » → 3e sing.).
@@ -503,6 +583,14 @@ function devineNature(jetons, j, possibles) {
       return { code: nom, raison: `« ${j.texte} » est précédé d’un déterminant : c’est sans doute un nom.` };
     }
     return { code: 'verbe', raison: `Change le temps de la phrase : si « ${j.texte} » change, c’est un verbe ; s’il peut être précédé d’un déterminant, c’est un nom.` };
+  }
+  // « en » : pronom devant un verbe (j'en mange), préposition sinon (en hiver).
+  if (possibles.includes('pro.adv') && possibles.includes('prep')) {
+    const devantVerbe = suivant && (formesConjuguees(suivant.texte).length || naturesPossibles(suivant.texte).includes('pro.adv')
+      || ['y'].includes(normalise(suivant.texte)));
+    return devantVerbe
+      ? { code: 'pro.adv', raison: `« ${j.texte} » est placé devant un verbe : il remplace un groupe, c’est un pronom.` }
+      : { code: 'prep', raison: `« ${j.texte} » introduit un groupe (en hiver, en train) : c’est une préposition.` };
   }
   if (mot === 'que' || mot === "qu'") {
     const precedentNom = precedent && naturesPossibles(precedent.texte).some((n) => n.startsWith('nom'));

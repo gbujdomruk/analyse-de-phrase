@@ -123,7 +123,7 @@ export const HOMOGRAPHES_GARDES = {
   pas: ['nom.c'], point: ['nom.c'], son: ['nom.c'], entre: ['verbe'], vers: ['nom.c'],
   or: ['nom.c'], car: ['nom.c'], devant: ['nom.c'], avant: ['nom.c'], derrière: ['nom.c'],
   rien: ['nom.c'], tout: ['nom.c'], contre: ['nom.c'], personne: [], sous: ['nom.c'],
-  plus: [], bien: ['nom.c', 'adv', 'adj'], fin: ['nom.c', 'adj'], mille: ['nom.c'], sur: ['adj'],
+  plus: [], bien: ['nom.c', 'adv', 'adj'], fin: ['nom.c', 'adj'], mille: ['nom.c'],
   si: ['nom.c'], aussi: [], peu: ['nom.c'], trop: [], assez: [], très: [],
 };
 

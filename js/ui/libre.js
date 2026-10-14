@@ -97,7 +97,8 @@ class Analyse {
   }
 
   boutons(...liste) {
-    remplit(this.actions, el('div', { class: 'rangee' }, ...liste));
+    this.rangeeEtape = el('div', { class: 'rangee' }, ...liste);
+    remplit(this.actions, this.rangeeEtape);
   }
 
   bouton(texte, action, style = 'principal', { selection = false } = {}) {
@@ -258,6 +259,8 @@ class Analyse {
       if (groupe.some((i) => verbe.includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient le verbe : sélectionne seulement le complément.'));
       if (groupe.length && groupe.every((i) => sujet.includes(i))) return remplit(this.retour, bulle('faux', 'C’est le sujet : tu l’as déjà analysé.'));
       if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return remplit(this.retour, bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
+      const interdits = new Set([...this.verbes.flat(), ...sujet, ...this.groupes.flatMap((g) => g.jetons)]);
+      if (this.selectionIncomplete(groupe, interdits)) return;
       const ctx = { jetons: this.jetons, verbe, sujet, groupe, niveau: this.niveau, autres: this.groupes.filter((g) => g.verbe === k) };
       this.phrase.active(false);
       this.arbre(ctx, G.questionSuivante, (c) => {
@@ -272,6 +275,25 @@ class Analyse {
       this.bouton('Effacer', () => this.phrase.efface(), 'secondaire'),
       this.bouton(k + 1 < this.verbes.length ? 'Verbe suivant →' : 'J’ai fini les compléments →', () => this.etapeComplements(k + 1), 'lien'),
     );
+  }
+
+  // Avant les tests : la sélection est-elle un groupe entier ? Sinon on
+  // explique pourquoi et on propose le groupe probable.
+  selectionIncomplete(groupe, interdits) {
+    const pb = G.verifieSelection(this.jetons, groupe, interdits);
+    if (!pb) return false;
+    const t = (ind) => recompose(ind.map((i) => this.jetons[i]));
+    remplit(this.retour, bulle('attention', pb.message,
+      pb.suggestion ? el('p', { class: 'exemple' }, `Groupe proposé : « ${t(pb.suggestion)} »`) : null));
+    if (pb.suggestion) {
+      // On remet ensuite les boutons de l'étape (« Tester ce groupe »…).
+      const rangee = this.rangeeEtape;
+      const retour = () => { remplit(this.actions, rangee); this.majBoutons?.(); };
+      remplit(this.actions, el('div', { class: 'rangee' },
+        this.bouton('Sélectionner ce groupe', () => { this.phrase.choisit(pb.suggestion); retour(); }),
+        this.bouton('Corriger moi-même', () => { remplit(this.retour); retour(); }, 'secondaire')));
+    }
+    return true;
   }
 
   // Déroule un arbre de questions jusqu'à une conclusion.
@@ -313,6 +335,7 @@ class Analyse {
     const analyser = () => {
       const groupe = this.phrase.valeur();
       if (groupe.some((i) => this.verbes.flat().includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient un verbe conjugué : une expansion du nom est un adjectif, un groupe prépositionnel ou une relative entière.'));
+      if (this.selectionIncomplete(groupe, new Set([...this.verbes.flat(), ...this.expansions.flatMap((e) => e.jetons)]))) return;
       this.phrase.active(false);
       this.arbre({ jetons: this.jetons, groupe, niveau: this.niveau }, G.questionExpansion, (c) => {
         this.expansions.push({ jetons: groupe, ...c });
