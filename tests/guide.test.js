@@ -74,3 +74,20 @@ test('natures : locutions et indices de contexte', () => {
   assert.equal(nat['les@7'], 'pro.pers');
   assert.equal(nat['que@2'], 'pro.rel');
 });
+
+test('être + participe : adverbe intercalé et ambiguïté signalée', () => {
+  const j = D("J'en fais, précisément, pour m'entraîner, mais là, je suis totalement égarée");
+  assert.deepEqual(G.regroupeVerbes(j, [2, 14, 16]), [[2], [14, 16]]);
+  assert.deepEqual(G.regroupeVerbes(j, [2, 14, 16], new Set([16])), [[2], [14]]);
+  assert.equal(G.ambiguitesEtre(j, [2, 14, 16]).length, 1);
+  assert.match(G.remarquesVerbes(j, [2, 14])[0].texte, /attribut du sujet/);
+  // Pas d'ambiguïté avec un verbe qui se conjugue avec être ni avec avoir.
+  assert.equal(G.ambiguitesEtre(D('Elle est vite partie.'), [1, 3]).length, 0);
+  assert.equal(G.ambiguitesEtre(D('Il a totalement oublié.'), [1, 3]).length, 0);
+  assert.equal(G.ambiguitesEtre(D('Je me suis égarée.'), [2, 3]).length, 0);
+});
+
+test('pronom « en » : quantité ou préposition « de »', () => {
+  assert.equal(conclut("J'en fais.", [1], [2], [0], ['quantite']), 'COD');
+  assert.equal(conclut("J'en parle.", [1], [2], [0], ['de']), 'COI');
+});

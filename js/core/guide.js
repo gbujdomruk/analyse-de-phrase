@@ -28,23 +28,56 @@ export function candidatsVerbes(jetons) {
 }
 
 // Regroupe les mots sélectionnés en verbes : « a » + « mangé » = un verbe.
-// Entre l'auxiliaire et le participe, on tolère la négation et le sujet
-// inversé (« n'a pas mangé », « a-t-il mangé »).
-export function regroupeVerbes(jetons, selection) {
-  const tri = [...new Set(selection)].sort((a, b) => a - b);
+// Entre l'auxiliaire et le participe, on tolère la négation, les adverbes
+// et le sujet inversé (« n'a pas mangé », « a totalement oublié »,
+// « a-t-il mangé »). `etats` : participes que l'élève a déclarés attributs
+// (« je suis égarée » au sens de « perdue ») ; ils ne font pas partie du verbe.
+export function regroupeVerbes(jetons, selection, etats = new Set()) {
+  const tri = [...new Set(selection)].filter((i) => !etats.has(i)).sort((a, b) => a - b);
   const verbes = [];
   for (const i of tri) {
     const dernier = verbes.at(-1);
-    if (dernier) {
-      const entre = jetons.slice(dernier.at(-1) + 1, i);
-      const lie = entre.every((j) => NEGATION.has(normalise(j.texte)) || j.euphonique || (j.avant === '-' && analyses(j.texte).some((a) => a.n === 'pro.pers')));
-      const auxiliaire = estFormeAuxiliaire(jetons[dernier.at(-1)]) || estFormeAuxiliaire(jetons[dernier[0]]);
-      const participe = formesNonConjuguees(jetons[i].texte).some((f) => f.mode === 'par');
-      if (lie && auxiliaire && participe) { dernier.push(i); continue; }
-    }
+    if (dernier && rattacheAuxiliaire(jetons, dernier, i)) { dernier.push(i); continue; }
     verbes.push([i]);
   }
   return verbes;
+}
+
+function rattacheAuxiliaire(jetons, verbe, i) {
+  const entre = jetons.slice(verbe.at(-1) + 1, i);
+  const lie = entre.every((j) => !j.ponct && (NEGATION.has(normalise(j.texte)) || j.euphonique
+    || (j.avant === '-' && analyses(j.texte).some((a) => a.n === 'pro.pers'))
+    || naturesPossibles(j.texte).includes('adv')));
+  const auxiliaire = estFormeAuxiliaire(jetons[verbe.at(-1)]) || estFormeAuxiliaire(jetons[verbe[0]]);
+  const participe = formesNonConjuguees(jetons[i].texte).some((f) => f.mode === 'par');
+  return lie && auxiliaire && participe;
+}
+
+// Verbes qui forment leurs temps composés avec « être » (je suis parti).
+const VERBES_EN_ETRE = new Set([
+  'aller', 'venir', 'revenir', 'devenir', 'redevenir', 'parvenir', 'survenir', 'intervenir', 'advenir',
+  'partir', 'repartir', 'arriver', 'naître', 'mourir', 'décéder', 'rester', 'tomber', 'retomber',
+  'entrer', 'rentrer', 'sortir', 'ressortir', 'monter', 'remonter', 'descendre', 'redescendre',
+  'retourner', 'passer', 'repasser', 'apparaître',
+]);
+const PRONOMS_REFLECHIS = new Set(['me', "m'", 'te', "t'", 'se', "s'", 'nous', 'vous']);
+
+// « être » + participe passé d'un verbe qui ne se conjugue pas avec « être » :
+// temps composé pronominal, voix passive… ou participe employé comme adjectif
+// attribut (« je suis égarée » = perdue). Seul l'élève peut trancher.
+export function ambiguitesEtre(jetons, selection) {
+  const resultat = [];
+  for (const v of regroupeVerbes(jetons, selection)) {
+    if (v.length < 2) continue;
+    const aux = v.slice(0, -1).find((i) => lemmesVerbaux(jetons[i].texte).includes('être'));
+    if (aux === undefined || v.slice(0, -1).some((i) => lemmesVerbaux(jetons[i].texte).includes('avoir'))) continue;
+    const participe = v.at(-1);
+    if (lemmesVerbaux(jetons[participe].texte).some((l) => VERBES_EN_ETRE.has(l))) continue;
+    const avant = jetons.slice(0, aux).reverse().find((j) => !j.ponct && !NEGATION.has(normalise(j.texte)));
+    if (avant && PRONOMS_REFLECHIS.has(normalise(avant.texte))) continue; // je me suis égarée
+    resultat.push({ auxiliaire: aux, participe, verbe: v });
+  }
+  return resultat;
 }
 
 const estFormeAuxiliaire = (j) => analyses(j.texte).some((a) => a.n === 'verbe' && ['avoir', 'être'].includes(a.lemme) && a.formes.length);
@@ -64,7 +97,7 @@ export function remarquesVerbes(jetons, selection) {
     if (nonConj.length) {
       const f = nonConj[0];
       const participe = f.mode === 'par';
-      const auxAvant = participe && selection.some((k) => k < i && estFormeAuxiliaire(jetons[k]));
+      const auxAvant = participe && regroupeVerbes(jetons, selection).some((v) => v.length > 1 && v.includes(i));
       if (!auxAvant) {
         remarques.push({ i, type: 'attention', texte: `« ${j.texte} » est un ${f.libelle} (verbe ${f.lemme}) : seul, il n’est pas conjugué.${participe ? ' Est-il accompagné d’un auxiliaire (avoir, être) ?' : ''}` });
       }
@@ -75,9 +108,13 @@ export function remarquesVerbes(jetons, selection) {
   // Auxiliaire sélectionné sans son participe.
   for (const v of regroupeVerbes(jetons, selection)) {
     if (v.length !== 1 || !estFormeAuxiliaire(jetons[v[0]])) continue;
-    const suite = jetons.slice(v[0] + 1, v[0] + 5).find((j) => !j.ponct && !NEGATION.has(normalise(j.texte)) && !j.euphonique && j.avant !== '-');
-    if (suite && !selection.includes(suite.i) && formesNonConjuguees(suite.texte).some((f) => f.mode === 'par' && f.temps === 'pas')
-      && !analyses(suite.texte).some((a) => a.n === 'adj' && !a.rare)) {
+    const suite = jetons.slice(v[0] + 1, v[0] + 5).find((j) => !j.ponct && !NEGATION.has(normalise(j.texte)) && !j.euphonique
+      && j.avant !== '-' && !naturesPossibles(j.texte).includes('adv'));
+    if (!suite || selection.includes(suite.i) || !formesNonConjuguees(suite.texte).some((f) => f.mode === 'par' && f.temps === 'pas')) continue;
+    const etre = lemmesVerbaux(jetons[v[0]].texte).includes('être') && !lemmesVerbaux(jetons[v[0]].texte).includes('avoir');
+    if (etre && !lemmesVerbaux(suite.texte).some((l) => VERBES_EN_ETRE.has(l))) {
+      remarques.push({ i: v[0], type: 'attention', texte: `Après « ${jetons[v[0]].texte} », « ${suite.texte} » est un participe passé. S’il fait partie du verbe (voix passive, comme « est mangée par… »), sélectionne-le aussi. S’il décrit l’état du sujet, comme un adjectif (« je suis perdue, fatiguée »), c’est un attribut du sujet : garde ton choix.` });
+    } else if (!analyses(suite.texte).some((a) => a.n === 'adj' && !a.rare)) {
       remarques.push({ i: v[0], type: 'attention', texte: `« ${jetons[v[0]].texte} ${suite.texte} » est peut-être un verbe à un temps composé : sélectionne aussi le participe « ${suite.texte} ».` });
     }
   }
@@ -271,6 +308,22 @@ function questionPronom(ctx, r, mot) {
       return conclusion('ATS', 'attribut du sujet', ['Avec un verbe attributif, « le » reprend un attribut (« Heureux, il l’est »).']);
     }
     return conclusion('COD', 'complément d’objet direct (COD)', [`« ${mot} » remplace un groupe nominal construit sans préposition.`]);
+  }
+  if (mot === 'en') {
+    if (!('en' in r)) {
+      return {
+        id: 'en',
+        titre: 'Que remplace « en » ?',
+        texte: 'Remplace « en » par ce qu’il représente. Est-ce une quantité (du, de la, des… : « j’en mange » = « je mange du pain ») ou un groupe introduit par la préposition « de » (« j’en parle » = « je parle de ce film ») ?',
+        reponses: [{ id: 'quantite', texte: 'Une quantité (du, de la, des…)' }, { id: 'de', texte: 'Un groupe avec la préposition « de »' }],
+      };
+    }
+    return r.en === 'quantite'
+      ? conclusion('COD', 'complément d’objet direct (COD)', ['« en » remplace un groupe nominal introduit par un article partitif ou indéfini (du, des…), sans préposition.'])
+      : conclusion('COI', 'complément d’objet indirect (COI)', ['« en » remplace un groupe introduit par la préposition « de ».']);
+  }
+  if (mot === 'y') {
+    return conclusion('COI', 'complément d’objet indirect (COI)', ['« y » remplace un groupe introduit par une préposition (à cela, à Paris, dans la maison…) lié au verbe.']);
   }
   if (!('preposition' in r)) {
     const exemple = `Par exemple : « il me parle » → « il parle à Paul » (avec « à ») ; « il me voit » → « il voit Paul » (sans préposition).`;

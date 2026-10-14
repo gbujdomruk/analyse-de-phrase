@@ -4,7 +4,7 @@ import { NIVEAUX } from './data/terminologie.js';
 import { ecranThemes, ecranExercice } from './ui/entrainement.js';
 import { ecranSaisie } from './ui/libre.js';
 import { ecranFiches } from './ui/fiches.js';
-import { el, vide, memoire } from './ui/composants.js';
+import { el, remplit, memoire } from './ui/composants.js';
 
 const racine = document.getElementById('app');
 const choixNiveau = document.getElementById('niveau');
@@ -20,7 +20,7 @@ choixNiveau.addEventListener('change', () => {
 });
 
 function accueil() {
-  vide(racine).append(
+  remplit(racine, 
     el('h1', {}, 'Analyser une phrase'),
     el('p', { class: 'intro' }, 'Apprends à trouver les verbes, les sujets, les compléments et la nature des mots, étape par étape.'),
     el('div', { class: 'cartes cartes-accueil' },

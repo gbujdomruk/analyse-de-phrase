@@ -18,6 +18,13 @@ export function el(tag, attrs = {}, ...enfants) {
 
 export const vide = (noeud) => { noeud.replaceChildren(); return noeud; };
 
+// Remplace le contenu d'un nœud ; les enfants absents (null, false) sont
+// ignorés au lieu d'afficher le texte « null ».
+export function remplit(noeud, ...enfants) {
+  noeud.replaceChildren(...enfants.flat().filter((c) => c != null && c !== false));
+  return noeud;
+}
+
 // --- Phrase interactive -----------------------------------------------------------
 
 // Affiche la phrase mot par mot. Chaque mot est un bouton qu'on touche pour

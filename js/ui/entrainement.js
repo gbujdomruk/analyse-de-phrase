@@ -9,10 +9,10 @@ import {
   verifieComplement, verifieCirconstance, circonstancesProposees, verifieExpansion,
   verifieProposition, typesPropositions, verifieNature, aides, fonctionsProposees, libelleNature,
 } from '../core/exercice.js';
-import { el, vide, PhraseInteractive, PanneauAide, bulle, choix, etapes, melange } from './composants.js';
+import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, etapes, melange } from './composants.js';
 
 export function ecranThemes(racine, niveau) {
-  vide(racine).append(
+  remplit(racine, 
     el('h1', {}, 'S’entraîner'),
     el('p', { class: 'intro' }, 'Choisis ce que tu veux travailler. Chaque phrase est corrigée étape par étape.'),
     el('div', { class: 'cartes' }, Object.entries(THEMES).map(([id, t]) => {
@@ -60,7 +60,7 @@ class Seance {
     this.consigne = el('h2', { class: 'consigne', 'aria-live': 'polite' });
     this.actions = el('div', { class: 'actions' });
     this.retour = el('div', { class: 'retour', 'aria-live': 'polite' });
-    vide(this.racine).append(
+    remplit(this.racine, 
       el('div', { class: 'barre-exercice' },
         el('a', { href: '#/entrainement', class: 'retour-lien' }, '← Thèmes'),
         el('span', { class: 'compteur' }, `${t.titre} · phrase ${this.rang + 1} / ${this.phrases.length}`)),
@@ -75,7 +75,7 @@ class Seance {
     const etape = this.etapeCourante;
     if (!etape) return this.bilan();
     const aDemander = this.ex.etapes.filter((e) => !e.donne);
-    vide(this.zoneEtapes).append(etapes(aDemander.map((e) => TITRES_ETAPES[e.type]), aDemander.indexOf(etape)));
+    remplit(this.zoneEtapes, etapes(aDemander.map((e) => TITRES_ETAPES[e.type]), aDemander.indexOf(etape)));
     this.trouves = [];
     this.phrase.efface();
     this.phrase.montre([]);
@@ -125,18 +125,18 @@ class Seance {
         majConsigne();
         if (this.trouves.length === item.cibles.length) this.termineItem(r.message);
         else {
-          vide(this.retour).append(bulle('juste', r.message));
+          remplit(this.retour, bulle('juste', r.message));
           this.phrase.active(true);
           this.choixGroupe(options, this.dernierChoix);
         }
       };
       // Pour un complément circonstanciel, on demande aussi son sens.
       if (g.fonction === 'CC' && g.precision && auNiveau(CIRCONSTANCES[g.precision].niveau, this.niveau)) {
-        vide(this.retour).append(bulle('juste', r.message, ' Quel est son sens ?'));
+        remplit(this.retour, bulle('juste', r.message, ' Quel est son sens ?'));
         this.phrase.active(false);
-        vide(this.actions).append(choix('Ce complément indique…', circonstancesProposees(this.niveau).map((c) => ({ ...c, detail: c.question })), (c) => {
+        remplit(this.actions, choix('Ce complément indique…', circonstancesProposees(this.niveau).map((c) => ({ ...c, detail: c.question })), (c) => {
           const rc = verifieCirconstance(g, c.code);
-          if (rc.statut === 'juste') { suite(); vide(this.retour).append(bulle('juste', rc.message)); } else this.affiche(rc);
+          if (rc.statut === 'juste') { suite(); remplit(this.retour, bulle('juste', rc.message)); } else this.affiche(rc);
         }, { colonnes: true }));
       } else suite();
     });
@@ -158,7 +158,7 @@ class Seance {
       this.aide.charge(aides(this.corrige, this.etapeCourante, item, this.niveau, this.trouves));
       majConsigne();
       if (this.trouves.length === item.cibles.length) this.termineItem(r.message);
-      else vide(this.retour).append(bulle('juste', r.message));
+      else remplit(this.retour, bulle('juste', r.message));
     });
   }
 
@@ -166,7 +166,7 @@ class Seance {
     this.phrase.active(false);
     this.phrase.surligner(item.prop.jetonsPropres);
     this.consigne.textContent = `Proposition ${item.prop.numero} sur ${this.corrige.propositions.length} : de quel type est la proposition surlignée ?`;
-    vide(this.actions).append(choix(null, typesPropositions(this.niveau), (t) => {
+    remplit(this.actions, choix(null, typesPropositions(this.niveau), (t) => {
       this.affiche(verifieProposition(this.corrige, item, t.code), () => {});
     }));
   }
@@ -176,11 +176,11 @@ class Seance {
     this.phrase.surligner(item.unite.jetons);
     this.consigne.textContent = `Quelle est la nature de « ${item.unite.texte} » ? (${this.item + 1} / ${this.etapeCourante.items.length})`;
     const groupes = naturesProposees(this.niveau);
-    const montreCategories = () => vide(this.actions).append(choix(null, groupes.map((g) => ({ ...g })), (g) => {
+    const montreCategories = () => remplit(this.actions, choix(null, groupes.map((g) => ({ ...g })), (g) => {
       // On demande la sous-catégorie seulement si elle est au programme.
       if (g.sous.length && categorie(item.attendu) === g.code && item.attendu !== g.code) {
-        vide(this.retour).append(bulle('partiel', `Oui, c’est ${libelleNature(g.code)}. Précise lequel ou laquelle :`));
-        vide(this.actions).append(choix(null, g.sous, (s) => this.affiche(verifieNature(item, s.code, this.niveau), () => {})),
+        remplit(this.retour, bulle('partiel', `Oui, c’est ${libelleNature(g.code)}. Précise lequel ou laquelle :`));
+        remplit(this.actions, choix(null, g.sous, (s) => this.affiche(verifieNature(item, s.code, this.niveau), () => {})),
           el('button', { type: 'button', class: 'bouton bouton-lien', onclick: montreCategories }, '← Autre catégorie'));
         return;
       }
@@ -197,7 +197,7 @@ class Seance {
     const effacer = el('button', { type: 'button', class: 'bouton bouton-secondaire', onclick: () => this.phrase.efface() }, 'Effacer');
     this.majBoutons = () => { ok.disabled = this.phrase.valeur().length === 0; };
     this.majBoutons();
-    vide(this.actions).append(el('div', { class: 'rangee' }, ok, effacer, ...autres));
+    remplit(this.actions, el('div', { class: 'rangee' }, ok, effacer, ...autres));
   }
 
   // Sélection d'un groupe puis choix de sa fonction.
@@ -210,11 +210,11 @@ class Seance {
     const effacer = el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.phrase.efface() }, 'Effacer la sélection');
     this.majBoutons = () => liste.classList.toggle('en-attente', this.phrase.valeur().length === 0);
     this.majBoutons();
-    vide(this.actions).append(liste, effacer);
+    remplit(this.actions, liste, effacer);
   }
 
   affiche(r, siJuste) {
-    vide(this.retour).append(bulle(r.statut, r.message));
+    remplit(this.retour, bulle(r.statut, r.message));
     if (r.statut === 'faux') this.erreurs++;
     if (r.statut === 'juste' && siJuste) {
       siJuste();
@@ -227,8 +227,8 @@ class Seance {
     this.phrase.montre([]);
     const dernier = this.etape === this.ex.etapes.length - 1 && this.item === this.etapeCourante.items.length - 1;
     const suivant = el('button', { type: 'button', class: 'bouton bouton-principal', onclick: () => this.avance() }, dernier ? 'Voir le bilan' : 'Continuer →');
-    vide(this.retour).append(bulle('juste', message));
-    vide(this.actions).append(suivant);
+    remplit(this.retour, bulle('juste', message));
+    remplit(this.actions, suivant);
     suivant.focus();
   }
 
@@ -267,16 +267,16 @@ class Seance {
     const natures = c.natures && this.ex.etapes.some((e) => e.type === 'natures')
       ? el('p', { class: 'natures-bilan' }, c.natures.map((u) => el('span', {}, el('strong', {}, u.texte), ` ${NATURES[natureAuNiveau(u.nature, this.niveau)]?.nom.toLowerCase() ?? u.nature}`)))
       : null;
-    vide(this.consigne).append(this.erreurs === 0 ? 'Parfait, sans erreur !' : `Phrase terminée (${this.erreurs} erreur${this.erreurs > 1 ? 's' : ''} corrigée${this.erreurs > 1 ? 's' : ''}).`);
+    remplit(this.consigne, this.erreurs === 0 ? 'Parfait, sans erreur !' : `Phrase terminée (${this.erreurs} erreur${this.erreurs > 1 ? 's' : ''} corrigée${this.erreurs > 1 ? 's' : ''}).`);
     vide(this.zoneEtapes);
     this.aide.racine.hidden = true;
-    vide(this.retour).append(tableau, natures, c.note ? bulle('info', c.note) : null);
-    vide(this.actions).append(el('button', { type: 'button', class: 'bouton bouton-principal', onclick: () => this.phraseSuivante() },
+    remplit(this.retour, tableau, natures, c.note ? bulle('info', c.note) : null);
+    remplit(this.actions, el('button', { type: 'button', class: 'bouton bouton-principal', onclick: () => this.phraseSuivante() },
       this.rang + 1 < this.phrases.length ? 'Phrase suivante →' : 'Terminer'));
   }
 
   fin() {
-    vide(this.racine).append(
+    remplit(this.racine, 
       el('h1', {}, 'Bravo !'),
       el('p', { class: 'intro' }, `Tu as analysé ${this.phrases.length} phrase${this.phrases.length > 1 ? 's' : ''}, dont ${this.reussites} sans aucune erreur.`),
       el('div', { class: 'rangee' },

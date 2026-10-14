@@ -7,7 +7,7 @@ import { decoupe, normalise, recompose } from '../core/decoupage.js';
 import { chargeLexique, estMotCompose, formesConjuguees, naturesPossibles } from '../core/lexique.js';
 import * as G from '../core/guide.js';
 import * as M from '../core/manipulations.js';
-import { el, vide, PhraseInteractive, PanneauAide, bulle, choix, etapes, memoire } from './composants.js';
+import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, etapes, memoire } from './composants.js';
 
 const EXEMPLES = [
   'Le chat de la voisine dort sur le canapé.',
@@ -24,18 +24,18 @@ export function ecranSaisie(racine, niveau) {
   const etat = el('div', { class: 'retour', 'aria-live': 'polite' });
   const lancer = async () => {
     const texte = zone.value.trim().replace(/\s+/g, ' ');
-    if (!/\p{L}/u.test(texte)) { vide(etat).append(bulle('faux', 'Écris d’abord une phrase.')); return; }
+    if (!/\p{L}/u.test(texte)) { remplit(etat, bulle('faux', 'Écris d’abord une phrase.')); return; }
     memoire.ecrit('derniere-phrase', texte);
-    vide(etat).append(bulle('info', 'Chargement du dictionnaire…'));
+    remplit(etat, bulle('info', 'Chargement du dictionnaire…'));
     try {
       await chargeLexique();
     } catch (e) {
-      vide(etat).append(bulle('faux', `Le dictionnaire n’a pas pu être chargé (${e.message}). Vérifie ta connexion et réessaie.`));
+      remplit(etat, bulle('faux', `Le dictionnaire n’a pas pu être chargé (${e.message}). Vérifie ta connexion et réessaie.`));
       return;
     }
     new Analyse(racine, niveau, texte).demarre();
   };
-  vide(racine).append(
+  remplit(racine, 
     el('h1', {}, 'Analyser ma phrase'),
     el('p', { class: 'intro' }, 'Écris une phrase trouvée dans un exercice. L’application ne connaît pas la réponse : elle te fait faire les tests de la méthode, étape par étape, et vérifie ce qui peut l’être (dictionnaire, accords).'),
     el('label', { for: 'saisie', class: 'etiquette-champ' }, 'Ta phrase'),
@@ -72,7 +72,7 @@ class Analyse {
     this.consigne = el('h2', { class: 'consigne', 'aria-live': 'polite' });
     this.actions = el('div', { class: 'actions' });
     this.retour = el('div', { class: 'retour', 'aria-live': 'polite' });
-    vide(this.racine).append(
+    remplit(this.racine, 
       el('div', { class: 'barre-exercice' },
         el('a', { href: '#/libre', class: 'retour-lien' }, '← Autre phrase'),
         el('span', { class: 'compteur' }, 'Analyse guidée')),
@@ -83,7 +83,7 @@ class Analyse {
 
   // Prépare l'écran d'une étape.
   ouvre(nomEtape, consigne, aides = []) {
-    vide(this.zoneEtapes).append(etapes(this.nomsEtapes, this.nomsEtapes.indexOf(nomEtape)));
+    remplit(this.zoneEtapes, etapes(this.nomsEtapes, this.nomsEtapes.indexOf(nomEtape)));
     this.consigne.textContent = consigne;
     this.phrase.efface();
     this.phrase.montre([]);
@@ -97,7 +97,7 @@ class Analyse {
   }
 
   boutons(...liste) {
-    vide(this.actions).append(el('div', { class: 'rangee' }, ...liste));
+    remplit(this.actions, el('div', { class: 'rangee' }, ...liste));
   }
 
   bouton(texte, action, style = 'principal', { selection = false } = {}) {
@@ -123,15 +123,12 @@ class Analyse {
     const valider = () => {
       const sel = this.phrase.valeur();
       const remarques = G.remarquesVerbes(this.jetons, sel);
-      const suite = () => {
-        this.verbes = G.regroupeVerbes(this.jetons, sel);
-        this.marqueVerbes();
-        if (this.verbes.length > 1) this.etapePropositions(); else this.etapeSujets(0);
-      };
+      const suite = () => this.leveAmbiguites(sel, G.ambiguitesEtre(this.jetons, sel), new Set());
       if (!remarques.length) return suite();
-      vide(this.retour).append(...remarques.map((r) => bulle(r.type === 'erreur' ? 'faux' : 'attention', r.texte)));
+      remplit(this.retour, ...remarques.map((r) => bulle(r.type === 'erreur' ? 'faux' : 'attention', r.texte)));
+      this.phrase.active(false);
       this.boutons(
-        this.bouton('Corriger ma sélection', () => this.etapeVerbes(), 'principal'),
+        this.bouton('Corriger ma sélection', () => { this.etapeVerbes(); this.phrase.choisit(sel); }, 'principal'),
         this.bouton('Je garde mon choix', suite, 'secondaire'),
       );
     };
@@ -142,9 +139,36 @@ class Analyse {
     );
   }
 
+  // « je suis égarée » : temps composé / passif, ou participe attribut ?
+  // On pose la question pour chaque cas, puis on enregistre les verbes.
+  leveAmbiguites(sel, ambiguites, etats) {
+    const [a, ...reste] = ambiguites;
+    if (!a) {
+      this.verbes = G.regroupeVerbes(this.jetons, sel, etats);
+      this.etatsAttributs = etats;
+      this.marqueVerbes();
+      if (this.verbes.length > 1) this.etapePropositions(); else this.etapeSujets(0);
+      return;
+    }
+    const aux = this.jetons[a.auxiliaire].texte;
+    const part = this.jetons[a.participe].texte;
+    this.phrase.active(false);
+    this.phrase.surligner(a.verbe);
+    remplit(this.retour, el('div', { class: 'carte-question' },
+      el('p', { class: 'question-titre' }, `« ${aux} … ${part} » : un seul verbe ?`),
+      el('p', {}, `« ${part} » est le participe passé d’un verbe, placé après « ${aux} ». Deux analyses sont possibles :`),
+      el('ul', {},
+        el('li', {}, el('strong', {}, 'Voix passive : '), `quelqu’un fait l’action sur le sujet ; on peut ajouter « par… » (« la souris est attrapée par le chat »). Alors « ${aux} ${part} » est un seul verbe.`),
+        el('li', {}, el('strong', {}, 'État du sujet : '), `« ${part} » décrit comment est le sujet, comme un adjectif ; on peut le remplacer par un adjectif (« je suis perdue, fatiguée »). Alors seul « ${aux} » est le verbe, et « ${part} » est attribut du sujet.`))));
+    this.boutons(
+      this.bouton('Voix passive : un seul verbe', () => this.leveAmbiguites(sel, reste, etats), 'secondaire'),
+      this.bouton('État du sujet : attribut', () => this.leveAmbiguites(sel, reste, new Set([...etats, a.participe])), 'secondaire'),
+    );
+  }
+
   phraseSansVerbe() {
     this.verbes = [];
-    vide(this.retour).append(bulle('info', 'Une phrase sans verbe conjugué est une phrase non verbale (« Quel beau temps ! »). On passe directement à la nature des mots.'));
+    remplit(this.retour, bulle('info', 'Une phrase sans verbe conjugué est une phrase non verbale (« Quel beau temps ! »). On passe directement à la nature des mots.'));
     this.boutons(this.bouton('Continuer →', () => this.etapeNatures(0)));
   }
 
@@ -161,7 +185,7 @@ class Analyse {
     this.phrase.active(false);
     const liens = motsDeLiaison(this.jetons);
     this.phrase.surligner(liens.map((l) => l.i));
-    vide(this.retour).append(
+    remplit(this.retour, 
       liens.length
         ? bulle('info', el('p', {}, 'Voici les mots qui relient les propositions :'), el('ul', {}, liens.map((l) => el('li', {}, el('strong', {}, `« ${l.texte} » `), l.role))))
         : bulle('info', 'Aucun mot de liaison : les propositions sont sans doute juxtaposées (séparées par une virgule, un point-virgule ou deux points).'),
@@ -181,11 +205,11 @@ class Analyse {
 
     const valider = () => {
       const sel = this.phrase.valeur();
-      if (sel.some((i) => verbe.includes(i))) { vide(this.retour).append(bulle('faux', 'Le verbe ne fait pas partie du sujet.')); return; }
+      if (sel.some((i) => verbe.includes(i))) { remplit(this.retour, bulle('faux', 'Le verbe ne fait pas partie du sujet.')); return; }
       const test = M.encadreSujet(this.jetons, sel, verbe);
       const accord = G.verifieAccord(this.jetons, sel, verbe);
       this.phrase.active(false);
-      vide(this.retour).append(
+      remplit(this.retour, 
         bulle('info', el('p', {}, 'Fais le test « C’est… qui » :'), el('p', { class: 'exemple' }, test), el('p', {}, 'Cette phrase est-elle correcte et dit-elle la même chose que ta phrase ?')),
         accord ? bulle('attention', accord) : null,
       );
@@ -197,18 +221,18 @@ class Analyse {
         }),
         this.bouton('Non', () => {
           this.etapeSujets(k);
-          vide(this.retour).append(bulle('info', `Cherche un autre groupe : « ${q1} »`));
+          remplit(this.retour, bulle('info', `Cherche un autre groupe : « ${q1} »`));
         }, 'secondaire'),
       );
     };
     const sansSujet = () => {
       const imperatif = verbe.some((i) => formesConjuguees(this.jetons[i].texte).some((f) => f.mode === 'imp'));
       if (!imperatif) {
-        vide(this.retour).append(bulle('attention', `D’après le dictionnaire, « ${v} » ne peut pas être à l’impératif : il a sûrement un sujet. Pose la question « ${q1} »`));
+        remplit(this.retour, bulle('attention', `D’après le dictionnaire, « ${v} » ne peut pas être à l’impératif : il a sûrement un sujet. Pose la question « ${q1} »`));
         return;
       }
       this.sujets[k] = null;
-      vide(this.retour).append(bulle('juste', `D’accord : « ${v} » est à l’impératif, le sujet n’est pas exprimé.`));
+      remplit(this.retour, bulle('juste', `D’accord : « ${v} » est à l’impératif, le sujet n’est pas exprimé.`));
       this.boutons(this.bouton('Continuer →', () => this.etapeSujets(k + 1)));
     };
     this.boutons(
@@ -231,9 +255,9 @@ class Analyse {
     const analyser = () => {
       const groupe = this.phrase.valeur();
       const sujet = this.sujets[k] ?? [];
-      if (groupe.some((i) => verbe.includes(i))) return vide(this.retour).append(bulle('faux', 'Ta sélection contient le verbe : sélectionne seulement le complément.'));
-      if (groupe.length && groupe.every((i) => sujet.includes(i))) return vide(this.retour).append(bulle('faux', 'C’est le sujet : tu l’as déjà analysé.'));
-      if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return vide(this.retour).append(bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
+      if (groupe.some((i) => verbe.includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient le verbe : sélectionne seulement le complément.'));
+      if (groupe.length && groupe.every((i) => sujet.includes(i))) return remplit(this.retour, bulle('faux', 'C’est le sujet : tu l’as déjà analysé.'));
+      if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return remplit(this.retour, bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
       const ctx = { jetons: this.jetons, verbe, sujet, groupe, niveau: this.niveau, autres: this.groupes.filter((g) => g.verbe === k) };
       this.phrase.active(false);
       this.arbre(ctx, G.questionSuivante, (c) => {
@@ -254,7 +278,7 @@ class Analyse {
   arbre(ctx, questionSuivante, surConclusion, surAnnulation, chemin = []) {
     const q = questionSuivante(ctx, chemin);
     if (q.conclusion) {
-      vide(this.retour).append(bulle('juste',
+      remplit(this.retour, bulle('juste',
         el('p', {}, 'Conclusion : ', el('strong', {}, q.nom)),
         el('ul', {}, q.raisons.filter(Boolean).map((r) => el('li', {}, r))),
         el('p', { class: 'petit' }, FONCTIONS[q.fonction]?.definition ?? '')));
@@ -264,11 +288,11 @@ class Analyse {
       );
       return;
     }
-    vide(this.retour).append(el('div', { class: 'carte-question' },
+    remplit(this.retour, el('div', { class: 'carte-question' },
       el('p', { class: 'question-titre' }, q.titre),
       el('p', {}, q.texte),
       q.exemple ? el('p', { class: 'exemple' }, q.exemple) : null));
-    vide(this.actions).append(
+    remplit(this.actions, 
       choix(null, q.reponses.map((r) => ({ nom: r.texte, id: r.id })), (r) => this.arbre(ctx, questionSuivante, surConclusion, surAnnulation, [...chemin, { question: q.id, reponse: r.id }]), { colonnes: q.reponses.length > 3 }),
       el('button', { type: 'button', class: 'bouton bouton-lien', onclick: surAnnulation }, 'Annuler'),
     );
@@ -278,7 +302,7 @@ class Analyse {
     const faits = new Set([...this.verbes.flat(), ...this.sujets.flat().filter((i) => i != null), ...this.groupes.flatMap((g) => g.jetons)]);
     const restants = this.jetons.filter((j) => !j.ponct && !j.euphonique && !faits.has(j.i));
     if (restants.length) {
-      vide(this.retour).append(bulle('info', `Mots pas encore analysés : ${restants.map((j) => j.texte).join(' · ')}. Certains n’ont pas de fonction (ne… pas, et, mais, que…).`));
+      remplit(this.retour, bulle('info', `Mots pas encore analysés : ${restants.map((j) => j.texte).join(' · ')}. Certains n’ont pas de fonction (ne… pas, et, mais, que…).`));
     }
   }
 
@@ -288,7 +312,7 @@ class Analyse {
     this.ouvre('Groupe nominal', 'Sélectionne un mot ou un groupe qui complète un nom (ou un adjectif), puis lance les tests.', METHODES.expansions.etapes);
     const analyser = () => {
       const groupe = this.phrase.valeur();
-      if (groupe.some((i) => this.verbes.flat().includes(i))) return vide(this.retour).append(bulle('faux', 'Ta sélection contient un verbe conjugué : une expansion du nom est un adjectif, un groupe prépositionnel ou une relative entière.'));
+      if (groupe.some((i) => this.verbes.flat().includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient un verbe conjugué : une expansion du nom est un adjectif, un groupe prépositionnel ou une relative entière.'));
       this.phrase.active(false);
       this.arbre({ jetons: this.jetons, groupe, niveau: this.niveau }, G.questionExpansion, (c) => {
         this.expansions.push({ jetons: groupe, ...c });
@@ -325,14 +349,14 @@ class Analyse {
     const enregistre = (code) => { this.natures[k] = { ...u, nature: code }; this.etapeNatures(k + 1); };
     const choisit = (code) => {
       if (!possibles.length || possibles.includes(code) || possibles.some((p) => NATURES[p]?.parent === code)) return enregistre(code);
-      vide(this.retour).append(bulle('attention', `Le dictionnaire ne connaît pas « ${u.texte} » comme ${NATURES[code].nom.toLowerCase()}. Es-tu sûr·e ?`));
+      remplit(this.retour, bulle('attention', `Le dictionnaire ne connaît pas « ${u.texte} » comme ${NATURES[code].nom.toLowerCase()}. Es-tu sûr·e ?`));
       this.boutons(this.bouton('Je garde mon choix', () => enregistre(code), 'secondaire'), this.bouton('Changer', () => this.etapeNatures(k)));
     };
     const toutes = naturesProposees(this.niveau).flatMap((g) => (g.sous.length ? g.sous : [{ code: g.code, nom: g.nom }]));
-    const montreToutes = () => vide(this.actions).append(choix('Toutes les natures :', toutes, (o) => choisit(o.code), { colonnes: true }), passer);
+    const montreToutes = () => remplit(this.actions, choix('Toutes les natures :', toutes, (o) => choisit(o.code), { colonnes: true }), passer);
     const passer = el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.bilan() }, 'Passer au bilan');
     if (possibles.length) {
-      vide(this.actions).append(
+      remplit(this.actions, 
         choix('Natures possibles d’après le dictionnaire :', possibles.map((p) => ({ code: p, nom: NATURES[p]?.nom ?? p })), (o) => choisit(o.code), { colonnes: true }),
         el('button', { type: 'button', class: 'bouton bouton-lien', onclick: montreToutes }, 'Autre nature…'),
         passer,
@@ -362,7 +386,7 @@ class Analyse {
     });
     for (const e of this.expansions) lignes.push(el('tr', {}, el('td', {}, t(e.jetons)), el('td', {}, majuscule(e.nom)), el('td', { class: 'petit' }, e.raisons.filter(Boolean).join(' '))));
     const natures = this.natures.filter(Boolean);
-    vide(this.retour).append(
+    remplit(this.retour, 
       lignes.length ? el('table', { class: 'tableau-bilan' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Groupe'), el('th', {}, 'Fonction'), el('th', {}, 'Pourquoi'))),
         el('tbody', {}, lignes)) : null,

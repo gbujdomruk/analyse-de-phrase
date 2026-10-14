@@ -2,12 +2,12 @@
 
 import { METHODES } from '../data/methodes.js';
 import { FONCTIONS, NATURES, auNiveau } from '../data/terminologie.js';
-import { el, vide } from './composants.js';
+import { el, remplit } from './composants.js';
 
 export function ecranFiches(racine, niveau) {
   const fonctions = Object.values(FONCTIONS).filter((f) => auNiveau(f.niveau, niveau));
   const natures = Object.values(NATURES).filter((n) => auNiveau(n.niveau, niveau));
-  vide(racine).append(
+  remplit(racine, 
     el('h1', {}, 'Aide-mémoire'),
     el('p', { class: 'intro' }, 'Les méthodes pour ne plus rester bloqué·e. Touche un titre pour l’ouvrir.'),
     ...Object.values(METHODES).map((m) => el('details', { class: 'fiche' },
