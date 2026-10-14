@@ -88,6 +88,7 @@ class Analyse {
     this.phrase.efface();
     this.phrase.montre([]);
     this.phrase.surligner([]);
+    this.phrase.teinter([]);
     this.phrase.active(true);
     vide(this.retour);
     vide(this.actions);
@@ -146,6 +147,7 @@ class Analyse {
     const [a, ...reste] = ambiguites;
     if (!a) {
       this.verbes = G.regroupeVerbes(this.jetons, sel, etats);
+      this.propositions = this.verbes.length > 1 ? undefined : [this.jetons.filter((j) => !j.ponct).map((j) => j.i)];
       this.etatsAttributs = etats;
       this.marqueVerbes();
       if (this.verbes.length > 1) this.etapePropositions(); else this.etapeSujets(0);
@@ -182,16 +184,48 @@ class Analyse {
 
   etapePropositions() {
     const n = this.verbes.length;
-    this.ouvre('Propositions', `Ta phrase contient ${n} verbes conjugués : elle contient donc ${n} propositions.`, METHODES.propositions.etapes);
+    this.propositions ??= G.delimitePropositions(this.jetons, this.verbes);
+    this.ouvre('Propositions', `Ta phrase contient ${n} verbes conjugués, donc ${n} propositions. Voici comment l’application les délimite : vérifie !`, METHODES.propositions.etapes);
     this.phrase.active(false);
+    this.phrase.teinter(this.propositions);
     const liens = motsDeLiaison(this.jetons);
-    this.phrase.surligner(liens.map((l) => l.i));
-    remplit(this.retour, 
-      liens.length
-        ? bulle('info', el('p', {}, 'Voici les mots qui relient les propositions :'), el('ul', {}, liens.map((l) => el('li', {}, el('strong', {}, `« ${l.texte} » `), l.role))))
-        : bulle('info', 'Aucun mot de liaison : les propositions sont sans doute juxtaposées (séparées par une virgule, un point-virgule ou deux points).'),
+    remplit(this.retour,
+      bulle('info', el('ul', { class: 'liste-props' }, this.verbes.map((v, k) => el('li', {},
+        el('span', { class: `legende-prop prop-${(k % 4) + 1}`, 'aria-hidden': 'true' }),
+        `Proposition du verbe « ${M.texteVerbe(this.jetons, v)} » : `, el('em', {}, `« ${texteMorceaux(this.jetons, this.propositions[k] ?? [])} »`)))),
+      el('p', { class: 'petit' }, 'Une proposition peut en contenir une autre : dans « Le chat qui dort appartient à ma voisine », la relative « qui dort » est placée à l’intérieur de la proposition « Le chat … appartient à ma voisine ». Les conjonctions de coordination (et, mais…) n’appartiennent à aucune proposition.')),
+      liens.length ? bulle('info', el('p', {}, 'Les mots qui relient les propositions :'), el('ul', {}, liens.map((l) => el('li', {}, el('strong', {}, `« ${l.texte} » `), l.role)))) : null,
     );
-    this.boutons(this.bouton('Continuer →', () => this.etapeSujets(0)));
+    this.boutons(
+      this.bouton('C’est juste →', () => { this.phrase.teinter([]); this.etapeSujets(0); }),
+      this.bouton('Corriger', () => this.corrigeProposition(0), 'secondaire'),
+    );
+  }
+
+  // L'élève sélectionne lui-même les mots de chaque proposition.
+  corrigeProposition(k) {
+    if (k >= this.verbes.length) return this.etapePropositions();
+    const verbe = this.verbes[k];
+    const v = M.texteVerbe(this.jetons, verbe);
+    this.ouvre('Propositions', `Touche tous les mots de la proposition du verbe « ${v} » (${k + 1} / ${this.verbes.length}).`, [
+      ...METHODES.propositions.etapes,
+      'Une proposition contient son verbe conjugué, son sujet et ses compléments. Une subordonnée commence par son mot subordonnant (qui, que, dont, où, quand…).',
+    ]);
+    this.phrase.teinter(this.propositions.map((p, n) => (n === k ? [] : p)));
+    this.phrase.surligner(verbe);
+    this.phrase.choisit(this.propositions[k] ?? []);
+    const valider = () => {
+      const sel = this.phrase.valeur().filter((i) => !this.jetons[i].ponct);
+      if (!verbe.every((i) => sel.includes(i))) return remplit(this.retour, bulle('faux', `La proposition doit contenir son verbe « ${v} ».`));
+      const autre = this.verbes.findIndex((w, n) => n !== k && w.some((i) => sel.includes(i)));
+      if (autre >= 0) return remplit(this.retour, bulle('faux', `Ta sélection contient le verbe « ${M.texteVerbe(this.jetons, this.verbes[autre])} » : chaque proposition n’a qu’un verbe conjugué.`));
+      this.propositions = this.propositions.map((p, n) => (n === k ? sel : p.filter((i) => !sel.includes(i))));
+      this.corrigeProposition(k + 1);
+    };
+    this.boutons(
+      this.bouton('Valider', valider, 'principal', { selection: true }),
+      this.bouton('Effacer', () => this.phrase.efface(), 'secondaire'),
+    );
   }
 
   // --- 3. Sujets ---------------------------------------------------------------------
@@ -261,7 +295,7 @@ class Analyse {
       if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return remplit(this.retour, bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
       const interdits = new Set([...this.verbes.flat(), ...sujet, ...this.groupes.flatMap((g) => g.jetons)]);
       if (this.selectionIncomplete(groupe, interdits)) return;
-      const proposition = G.delimitePropositions(this.jetons, this.verbes)[k];
+      const proposition = this.propositions?.[k] ?? null;
       const ctx = { jetons: this.jetons, verbe, sujet, groupe, proposition, niveau: this.niveau, autres: this.groupes.filter((g) => g.verbe === k) };
       this.phrase.active(false);
       this.arbre(ctx, G.questionSuivante, (c) => {
@@ -443,6 +477,16 @@ class Analyse {
     if (natures.length) l.push('', 'Natures :', ...natures.map((u) => `  ${u.texte} : ${NATURES[u.nature]?.nom.toLowerCase() ?? u.nature}`));
     return l.join('\n');
   }
+}
+
+// « Le chat … appartient à ma voisine » : les mots d'une proposition coupée.
+function texteMorceaux(jetons, indices) {
+  const tri = [...indices].sort((a, b) => a - b);
+  return tri.map((i, n) => {
+    if (n === 0) return jetons[i].texte;
+    const saute = jetons.slice(tri[n - 1] + 1, i).some((j) => !j.ponct);
+    return (saute ? ' … ' : jetons[i].avant === '' && !/'$/.test(jetons[tri[n - 1]].texte) ? '' : jetons[i].avant || '') + jetons[i].texte;
+  }).join('');
 }
 
 const majuscule = (s) => s.charAt(0).toUpperCase() + s.slice(1);

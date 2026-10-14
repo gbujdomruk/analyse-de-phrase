@@ -137,3 +137,16 @@ test('les tests se font dans la proposition du verbe', () => {
   const pl = G.delimitePropositions(l, [[3], [10]]);
   assert.equal(M.deplace(M.champ(l, pl[0], [4, 5]), [4, 5]).texte, 'Quand, le soir, la cloche sonne');
 });
+
+test('délimitation des propositions : emboîtement, inversion, coordination', () => {
+  const props = (s, verbes) => {
+    const j = D(s);
+    return G.delimitePropositions(j, verbes).map((p) => p.map((i) => j[i].texte).join(' '));
+  };
+  assert.deepEqual(props('Je regarde le chat qui dort sur le canapé.', [[1], [5]]), ['Je regarde le chat', 'qui dort sur le canapé']);
+  assert.deepEqual(props('Le chat qui dort sur le canapé appartient à ma voisine.', [[3], [7]]), ['qui dort sur le canapé', 'Le chat appartient à ma voisine']);
+  assert.deepEqual(props('Dans la forêt où vivent les loups, les lapins se cachent.', [[4], [10]]), ['où vivent les loups', 'Dans la forêt les lapins se cachent']);
+  assert.deepEqual(props("Quand arrive l'hiver, partent les oiseaux.", [[1], [5]]), ["Quand arrive l' hiver", 'partent les oiseaux']);
+  assert.deepEqual(props("J'aime le chat qui dort et qui ronronne.", [[1], [5], [8]]), ["J' aime le chat", 'qui dort', 'qui ronronne']);
+  assert.deepEqual(props('Il pleut et les enfants jouent dans le salon.', [[1], [5]]), ['Il pleut', 'les enfants jouent dans le salon']);
+});

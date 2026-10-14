@@ -181,6 +181,12 @@ main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; outline: none;
 .mot.indice { animation: clignote 1.2s ease-in-out 3; box-shadow: inset 0 0 0 3px var(--attention); }
 @keyframes clignote { 50% { background: var(--attention-fond); } }
 @media (prefers-reduced-motion: reduce) { .mot.indice { animation: none; } }
+/* Propositions colorées (étape « Propositions » du mode libre) */
+.prop-1 { background: color-mix(in srgb, var(--sujet) 16%, transparent); }
+.prop-2 { background: color-mix(in srgb, var(--circonstanciel) 18%, transparent); }
+.prop-3 { background: color-mix(in srgb, var(--objet) 18%, transparent); }
+.prop-4 { background: color-mix(in srgb, var(--attribut) 18%, transparent); }
+.legende-prop { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
 .ponct { align-self: flex-start; padding: 6px 2px; font-size: 1.3rem; }
 .ponct.colle { margin-left: -6px; }
 .etiquette {

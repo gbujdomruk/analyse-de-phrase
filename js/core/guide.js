@@ -123,38 +123,95 @@ export function remarquesVerbes(jetons, selection) {
 
 // --- Propositions ------------------------------------------------------------------
 
-// Délimite la proposition de chaque verbe, à partir des mots de liaison situés
-// entre deux verbes : conjonction de coordination (exclue des deux
-// propositions), mot subordonnant (qui ouvre la proposition suivante) ou, à
-// défaut, ponctuation. Sans frontière visible (relative enchâssée dans le
-// sujet), les deux propositions restent réunies : les tests se font alors
-// sur toute la phrase.
+const estSubordonnant = (j) => {
+  const n = naturesPossibles(j.texte);
+  return !j.ponct && n.some((x) => x === 'conj.sub' || x === 'pro.rel') && !n.includes('pro.pers');
+};
+const estCoordination = (j) => !j.ponct && naturesPossibles(j.texte).every((x) => x === 'conj.coord');
+
+// Propose une délimitation des propositions (l'élève la confirme ou la
+// corrige). Renvoie, pour chaque verbe, les indices des mots de sa
+// proposition ; une proposition peut être coupée par une autre qu'elle
+// contient (« Le chat [qui dort] appartient à ma voisine »).
+// Entre deux verbes, on cherche :
+// - une conjonction de coordination : elle sépare deux propositions et
+//   n'appartient à aucune ;
+// - un mot subordonnant (qui, que, dont, où, quand…) : il ouvre une
+//   proposition emboîtée dans la précédente ;
+// - une ponctuation : elle ferme la proposition emboîtée en cours, ou
+//   sépare deux propositions juxtaposées ;
+// - rien : la proposition emboîtée s'arrête avant le verbe suivant, qui
+//   appartient à la proposition qui la contient (« Le livre que tu m'as
+//   prêté est passionnant »).
 export function delimitePropositions(jetons, verbes) {
   const ordre = verbes.map((v, k) => ({ k, debut: Math.min(...v), fin: Math.max(...v) })).sort((a, b) => a.debut - b.debut);
-  const coupes = []; // { avant: dernier indice de la proposition, apres: premier indice de la suivante }
-  for (let n = 0; n + 1 < ordre.length; n++) {
-    const entre = jetons.slice(ordre[n].fin + 1, ordre[n + 1].debut);
-    const coord = [...entre].reverse().find((j) => !j.ponct && naturesPossibles(j.texte).every((x) => x === 'conj.coord'));
-    const sub = [...entre].reverse().find((j) => !j.ponct && naturesPossibles(j.texte).some((x) => x === 'conj.sub' || x === 'pro.rel')
-      && !naturesPossibles(j.texte).some((x) => x === 'pro.pers'));
-    const ponct = [...entre].reverse().find((j) => [',', ';', ':'].includes(j.texte));
-    if (coord) coupes.push({ avant: coord.i - 1, apres: coord.i + 1 });
-    else if (sub) coupes.push({ avant: sub.i - 1, apres: sub.i });
-    else if (ponct) coupes.push({ avant: ponct.i - 1, apres: ponct.i + 1 });
-    else coupes.push(null);
-  }
-  const resultat = new Array(verbes.length);
-  let debut = 0;
-  let groupe = [];
+  if (!ordre.length) return [];
+  const props = [];
+  const nouvelle = (k = null) => { const p = { verbes: k === null ? [] : [k], mots: [] }; props.push(p); return p; };
+  const pile = [];
+  const ajoute = (p, de, a) => { for (let i = de; i < a; i++) if (!jetons[i].ponct) p.mots.push(i); };
+
+  // Avant le premier verbe : un subordonnant (sauf en tête de phrase) ouvre
+  // une proposition emboîtée dans une proposition dont le verbe vient après.
+  const avant = jetons.slice(0, ordre[0].debut);
+  const sub = [...avant].reverse().find((j) => estSubordonnant(j) && j.i > 0);
+  let courante = nouvelle(ordre[0].k);
+  if (sub) {
+    const parent = nouvelle();
+    ajoute(parent, 0, sub.i);
+    pile.push(parent);
+    ajoute(courante, sub.i, ordre[0].debut);
+  } else ajoute(courante, 0, ordre[0].debut);
+
   ordre.forEach((o, n) => {
-    groupe.push(o.k);
-    const coupe = n < coupes.length ? coupes[n] : { avant: jetons.length - 1 };
-    if (coupe === null) return; // pas de frontière : on réunit avec la suivante
-    const span = jetons.slice(debut, coupe.avant + 1).filter((j) => !j.ponct).map((j) => j.i);
-    for (const k of groupe) resultat[k] = span;
-    groupe = [];
-    debut = coupe.apres ?? jetons.length;
+    ajoute(courante, o.debut, o.fin + 1);
+    const suivant = ordre[n + 1];
+    const fin = suivant ? suivant.debut : jetons.length;
+    if (!suivant) { ajoute(courante, o.fin + 1, fin); return; }
+    const entre = jetons.slice(o.fin + 1, fin);
+    const coord = [...entre].reverse().find(estCoordination);
+    const subord = [...entre].reverse().find(estSubordonnant);
+    const ponct = [...entre].reverse().find((j) => [',', ';', ':'].includes(j.texte));
+
+    if (subord && (!coord || subord.i > coord.i)) {
+      // Un subordonnant ouvre une proposition emboîtée…
+      if (coord && subord.i === coord.i + 1) {
+        // … coordonnée à la précédente (« qui dort et qui ronronne ») : même niveau.
+        ajoute(courante, o.fin + 1, coord.i);
+      } else {
+        ajoute(courante, o.fin + 1, subord.i);
+        pile.push(courante);
+      }
+      courante = nouvelle(suivant.k);
+      ajoute(courante, subord.i, fin);
+    } else if (coord) {
+      ajoute(courante, o.fin + 1, coord.i);
+      pile.length = 0;
+      courante = nouvelle(suivant.k);
+      ajoute(courante, coord.i + 1, fin);
+    } else if (ponct) {
+      ajoute(courante, o.fin + 1, ponct.i);
+      // La virgule ferme la proposition emboîtée : on revient à celle qui la
+      // contient si son verbe n'est pas encore passé (« Dans la forêt où vivent
+      // les loups, les lapins se cachent »), sinon les propositions sont juxtaposées.
+      const parent = pile.pop();
+      if (parent && !parent.verbes.length) { courante = parent; parent.verbes.push(suivant.k); } else courante = nouvelle(suivant.k);
+      ajoute(courante, ponct.i + 1, fin);
+    } else if (pile.length) {
+      // Rien entre les deux verbes : l'emboîtée s'arrête, on revient au parent.
+      ajoute(courante, o.fin + 1, fin);
+      const parent = pile.pop();
+      parent.verbes.push(suivant.k);
+      courante = parent;
+    } else {
+      // Aucune frontière repérable : on ne sépare pas (l'élève corrigera).
+      ajoute(courante, o.fin + 1, fin);
+      courante.verbes.push(suivant.k);
+    }
   });
+
+  const resultat = new Array(verbes.length);
+  for (const p of props) for (const k of p.verbes) resultat[k] = [...new Set(p.mots)].sort((a, b) => a - b);
   return resultat;
 }
 

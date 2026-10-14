@@ -36,6 +36,7 @@ export class PhraseInteractive {
     this.marques = [];
     this.indices = new Set();
     this.surligne = new Set();
+    this.teintes = [];
     this.actif = true;
     this.surSelection = surSelection;
     this.racine = el('div', { class: 'phrase', role: 'group', 'aria-label': 'Phrase à analyser' });
@@ -47,6 +48,8 @@ export class PhraseInteractive {
   retireMarques(filtre = () => true) { this.marques = this.marques.filter((m) => !filtre(m)); this.dessine(); }
   montre(indices = []) { this.indices = new Set(indices); this.dessine(); }
   surligner(indices = []) { this.surligne = new Set(indices); this.dessine(); }
+  // Colore les propositions : un tableau d'indices par proposition.
+  teinter(propositions = []) { this.teintes = propositions; this.dessine(); }
   efface() { this.selection.clear(); this.dessine(); this.surSelection([]); }
   active(oui) { this.actif = oui; this.dessine(); }
   valeur() { return [...this.selection].sort((a, b) => a - b); }
@@ -82,6 +85,8 @@ export class PhraseInteractive {
       if (e) classes.push('expansion', `x-${FONCTIONS[e.fonction]?.couleur ?? 'expansion'}`);
       if (this.indices.has(j.i)) classes.push('indice');
       if (this.surligne.has(j.i)) classes.push('surligne');
+      const p = this.teintes.findIndex((t) => t?.includes(j.i));
+      if (p >= 0) classes.push(`prop-${(p % 4) + 1}`);
       const premier = (g) => g && g.jetons.filter((k) => !this.jetons[k].ponct)[0] === j.i;
       const bouton = el('button', {
         type: 'button',
