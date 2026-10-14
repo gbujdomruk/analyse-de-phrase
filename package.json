@@ -1,0 +1,11 @@
+{
+  "name": "analyse-de-phrase",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Application pour apprendre à analyser une phrase en français",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serveur": "python3 -m http.server 8000"
+  }
+}
