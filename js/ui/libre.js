@@ -320,8 +320,8 @@ class Analyse {
 
   // Avant les tests : la sélection est-elle un groupe entier ? Sinon on
   // explique pourquoi et on propose le groupe probable.
-  selectionIncomplete(groupe, interdits) {
-    const pb = G.verifieSelection(this.jetons, groupe, interdits);
+  selectionIncomplete(groupe, interdits, etape = 'complements') {
+    const pb = G.verifieSelection(this.jetons, groupe, interdits, etape);
     if (!pb) return false;
     const t = (ind) => recompose(ind.map((i) => this.jetons[i]));
     remplit(this.retour, bulle('attention', pb.message,
@@ -377,7 +377,7 @@ class Analyse {
     const analyser = () => {
       const groupe = this.phrase.valeur();
       if (groupe.some((i) => this.verbes.flat().includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient un verbe conjugué : une expansion du nom est un adjectif, un groupe prépositionnel ou une relative entière.'));
-      if (this.selectionIncomplete(groupe, new Set([...this.verbes.flat(), ...this.expansions.flatMap((e) => e.jetons)]))) return;
+      if (this.selectionIncomplete(groupe, new Set([...this.verbes.flat(), ...this.expansions.flatMap((e) => e.jetons)]), 'expansions')) return;
       this.phrase.active(false);
       this.arbre({ jetons: this.jetons, groupe, niveau: this.niveau }, G.questionExpansion, (c) => {
         this.expansions.push({ jetons: groupe, ...c });

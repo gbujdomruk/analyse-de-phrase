@@ -66,7 +66,7 @@ export const FONCTIONS = {
   },
   CADJ: {
     nom: "Complément de l'adjectif", court: "Compl. de l'adjectif", abrege: 'Compl. adj.', niveau: 'c4', place: 'groupe', couleur: 'expansion',
-    definition: "Le complément de l'adjectif complète un adjectif ; il est introduit par une préposition : « fier de son travail ».",
+    definition: "Le complément de l'adjectif complète un adjectif : un adverbe qui en précise le degré (« très grand », « totalement égarée ») ou un groupe introduit par une préposition (« fier de son travail »).",
   },
   // Fonctions énonciatives et textuelles (terminologie II.2.7) : pas de
   // fonction syntaxique dans la phrase. Utilisées par le guide du mode libre.

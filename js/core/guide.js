@@ -235,7 +235,9 @@ const natureOutil = (jetons, j) => {
 // entier. Renvoie null si la sélection convient, sinon une explication et,
 // si possible, le groupe que l'élève voulait sans doute sélectionner.
 // `interdits` : mots déjà analysés (verbe, sujet, autres groupes).
-export function verifieSelection(jetons, groupe, interdits = new Set()) {
+// `etape` : 'complements' ou 'expansions'. À l'étape des expansions, un
+// adverbe seul devant un adjectif est justement ce qu'on analyse.
+export function verifieSelection(jetons, groupe, interdits = new Set(), etape = 'complements') {
   const ind = [...groupe].filter((i) => !jetons[i].ponct).sort((a, b) => a - b);
   if (!ind.length) return null;
   const premier = jetons[ind[0]];
@@ -271,6 +273,32 @@ export function verifieSelection(jetons, groupe, interdits = new Set()) {
       suggestion: suite.length > 1 ? [...ind, ...suite.slice(1)] : null,
     };
   }
+  // Adverbe de degré et adjectif : « je suis [totalement égarée] ». À l'étape
+  // des compléments, ils forment un seul groupe (attribut, épithète…) ;
+  // l'adverbe sera analysé à l'étape du groupe nominal.
+  if (etape === 'complements') {
+    const suivant = jetons[ind.at(-1) + 1];
+    if (ind.length === 1 && adverbeDeDegre(jetons, premier) && suivant && !interdits.has(suivant.i) && peutEtreAdjectif(suivant)) {
+      const adj = [suivant.i];
+      // « très gentille et souriante » : on s'arrête au premier adjectif.
+      return {
+        message: `« ${premier.texte} » précise le degré de « ${suivant.texte} » (on peut le remplacer par « très ») : il fait partie du même groupe. Sélectionne le groupe entier pour trouver sa fonction ; tu analyseras « ${premier.texte} » à l’étape « Groupe nominal » (complément de l’adjectif).`,
+        suggestion: [...ind, ...adj],
+      };
+    }
+    const adverbes = [];
+    for (let i = ind[0] - 1; i >= 0; i--) {
+      const j = jetons[i];
+      if (j.ponct || interdits.has(i) || !adverbeDeDegre(jetons, j)) break;
+      adverbes.unshift(i);
+    }
+    if (adverbes.length && peutEtreAdjectif(premier)) {
+      return {
+        message: `Juste avant, ${adverbes.map((i) => `« ${jetons[i].texte} »`).join(' ')} précise le degré de « ${premier.texte} » : il fait partie du même groupe.`,
+        suggestion: [...adverbes, ...ind],
+      };
+    }
+  }
   // Groupe qui commence juste après une préposition : « dans [le jardin] ».
   const avant = jetons[ind[0] - 1];
   if (avant && !avant.ponct && !interdits.has(avant.i) && natureProbable(jetons, avant) === 'prep') {
@@ -290,6 +318,20 @@ export function autreProposition(groupe, propositions, verbes, k) {
   return propositions.findIndex((p, n) => n !== k && p && ind.every((i) => p.includes(i))
     && !verbes[n].some((i) => ind.includes(i)));
 }
+
+// Adverbe qui peut modifier un adjectif (très, totalement, si…), sauf la
+// négation (« plus » compte s'il n'y a pas de « ne » avant : « plus grand »).
+function adverbeDeDegre(jetons, j) {
+  if (j.ponct) return false;
+  const mot = normalise(j.texte);
+  const natures = naturesPossibles(j.texte);
+  if (!natures.includes('adv') || natures.some((n) => n.startsWith('pro') || n === 'prep' || n.startsWith('det'))) return false;
+  if (mot === 'plus') return !jetons.slice(Math.max(0, j.i - 4), j.i).some((x) => ['ne', "n'"].includes(normalise(x.texte)));
+  return !NEGATION.has(mot);
+}
+
+const peutEtreAdjectif = (j) => !j.ponct && (naturesPossibles(j.texte).includes('adj')
+  || formesNonConjuguees(j.texte).some((f) => f.mode === 'par' && f.temps === 'pas'));
 
 // Prolonge une sélection à partir d'une préposition (jusqu'à la ponctuation,
 // une conjonction de coordination ou un mot déjà analysé) ou d'un déterminant

@@ -163,3 +163,18 @@ test('groupe d\'une autre proposition et connecteur retiré du test', () => {
   assert.equal(G.questionSuivante(ctx, [{ question: 'supprime', reponse: 'oui' }]).exemple, "Pour m'entraîner, j'en fais");
   assert.equal(G.premiereQuestion(ctx).exemple, "J'en fais");
 });
+
+test('adverbe de degré et adjectif forment un groupe à l\'étape des compléments', () => {
+  const j = D("J'en fais, précisément, pour m'entraîner, mais là, je suis totalement égarée");
+  const interdits = new Set([2, 14, 13]);
+  assert.deepEqual(G.verifieSelection(j, [15], interdits).suggestion, [15, 16]);
+  assert.deepEqual(G.verifieSelection(j, [16], interdits).suggestion, [15, 16]);
+  assert.equal(G.verifieSelection(j, [15, 16], interdits), null);
+  // À l'étape du groupe nominal, l'adverbe seul est accepté.
+  assert.equal(G.verifieSelection(j, [15], interdits, 'expansions'), null);
+  // La négation n'est pas un adverbe de degré.
+  const k = D("Elle n'est pas contente.");
+  assert.equal(G.verifieSelection(k, [4], new Set([2])), null);
+  const l = D('Elle est vraiment très contente.');
+  assert.deepEqual(G.verifieSelection(l, [4], new Set([1])).suggestion, [2, 3, 4]);
+});
