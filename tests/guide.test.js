@@ -122,3 +122,18 @@ test('« en » : pronom devant un verbe, préposition devant un nom', () => {
   assert.equal(G.candidatsNature(j, { jetons: [3], locution: null }).probable, 'prep');
   assert.equal(G.verifieSelection(j, [1]), null);
 });
+
+test('les tests se font dans la proposition du verbe', () => {
+  const j = D("J'en fais, précisément, pour m'entraîner, mais là, je suis totalement égarée");
+  const props = G.delimitePropositions(j, [[2], [14]]);
+  const champ = M.champ(j, props[1], [11]);
+  assert.equal(M.supprime(champ, [11]), 'Je suis totalement égarée');
+  // « là » est déjà en tête de sa proposition : on le déplace à la fin.
+  assert.deepEqual(M.deplace(champ, [11]), { texte: 'Je suis totalement égarée là', ou: 'fin' });
+  const k = D('Il pleut et les enfants jouent dans le salon.');
+  const pk = G.delimitePropositions(k, [[1], [5]]);
+  assert.equal(M.deplace(M.champ(k, pk[1], [6, 7, 8]), [6, 7, 8]).texte, 'Dans le salon, les enfants jouent.');
+  const l = D('Quand la cloche sonne le soir, les élèves rangent leurs affaires.');
+  const pl = G.delimitePropositions(l, [[3], [10]]);
+  assert.equal(M.deplace(M.champ(l, pl[0], [4, 5]), [4, 5]).texte, 'Quand, le soir, la cloche sonne');
+});

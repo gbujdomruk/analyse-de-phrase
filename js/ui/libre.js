@@ -261,7 +261,8 @@ class Analyse {
       if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return remplit(this.retour, bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
       const interdits = new Set([...this.verbes.flat(), ...sujet, ...this.groupes.flatMap((g) => g.jetons)]);
       if (this.selectionIncomplete(groupe, interdits)) return;
-      const ctx = { jetons: this.jetons, verbe, sujet, groupe, niveau: this.niveau, autres: this.groupes.filter((g) => g.verbe === k) };
+      const proposition = G.delimitePropositions(this.jetons, this.verbes)[k];
+      const ctx = { jetons: this.jetons, verbe, sujet, groupe, proposition, niveau: this.niveau, autres: this.groupes.filter((g) => g.verbe === k) };
       this.phrase.active(false);
       this.arbre(ctx, G.questionSuivante, (c) => {
         this.groupes.push({ verbe: k, jetons: groupe, ...c });
@@ -312,6 +313,7 @@ class Analyse {
     }
     remplit(this.retour, el('div', { class: 'carte-question' },
       el('p', { class: 'question-titre' }, q.titre),
+      q.contexte ? el('p', { class: 'petit' }, q.contexte) : null,
       el('p', {}, q.texte),
       q.exemple ? el('p', { class: 'exemple' }, q.exemple) : null));
     remplit(this.actions, 

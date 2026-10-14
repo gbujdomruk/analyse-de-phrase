@@ -121,6 +121,43 @@ export function remarquesVerbes(jetons, selection) {
   return remarques;
 }
 
+// --- Propositions ------------------------------------------------------------------
+
+// Délimite la proposition de chaque verbe, à partir des mots de liaison situés
+// entre deux verbes : conjonction de coordination (exclue des deux
+// propositions), mot subordonnant (qui ouvre la proposition suivante) ou, à
+// défaut, ponctuation. Sans frontière visible (relative enchâssée dans le
+// sujet), les deux propositions restent réunies : les tests se font alors
+// sur toute la phrase.
+export function delimitePropositions(jetons, verbes) {
+  const ordre = verbes.map((v, k) => ({ k, debut: Math.min(...v), fin: Math.max(...v) })).sort((a, b) => a.debut - b.debut);
+  const coupes = []; // { avant: dernier indice de la proposition, apres: premier indice de la suivante }
+  for (let n = 0; n + 1 < ordre.length; n++) {
+    const entre = jetons.slice(ordre[n].fin + 1, ordre[n + 1].debut);
+    const coord = [...entre].reverse().find((j) => !j.ponct && naturesPossibles(j.texte).every((x) => x === 'conj.coord'));
+    const sub = [...entre].reverse().find((j) => !j.ponct && naturesPossibles(j.texte).some((x) => x === 'conj.sub' || x === 'pro.rel')
+      && !naturesPossibles(j.texte).some((x) => x === 'pro.pers'));
+    const ponct = [...entre].reverse().find((j) => [',', ';', ':'].includes(j.texte));
+    if (coord) coupes.push({ avant: coord.i - 1, apres: coord.i + 1 });
+    else if (sub) coupes.push({ avant: sub.i - 1, apres: sub.i });
+    else if (ponct) coupes.push({ avant: ponct.i - 1, apres: ponct.i + 1 });
+    else coupes.push(null);
+  }
+  const resultat = new Array(verbes.length);
+  let debut = 0;
+  let groupe = [];
+  ordre.forEach((o, n) => {
+    groupe.push(o.k);
+    const coupe = n < coupes.length ? coupes[n] : { avant: jetons.length - 1 };
+    if (coupe === null) return; // pas de frontière : on réunit avec la suivante
+    const span = jetons.slice(debut, coupe.avant + 1).filter((j) => !j.ponct).map((j) => j.i);
+    for (const k of groupe) resultat[k] = span;
+    groupe = [];
+    debut = coupe.apres ?? jetons.length;
+  });
+  return resultat;
+}
+
 // --- Vérification de la sélection avant les tests ----------------------------------
 
 // Mots-outils qui n'ont pas de fonction par eux-mêmes (terminologie I.1.6).
@@ -265,17 +302,21 @@ export function questionSuivante(ctx, chemin) {
     return {
       id: 'supprime',
       titre: 'Test de suppression',
-      texte: 'Voici la phrase sans le groupe. Est-elle correcte et garde-t-elle son sens principal ?',
-      exemple: M.supprime(jetons, groupe),
+      texte: `Voici ${ctx.proposition ? 'la proposition' : 'la phrase'} sans le groupe. Est-elle correcte et garde-t-elle son sens principal ?`,
+      exemple: M.supprime(champDe(ctx), groupe),
+      contexte: contexteProposition(ctx),
       reponses: [{ id: 'oui', texte: 'Oui' }, { id: 'non', texte: 'Non' }],
     };
   }
   if (!('deplace' in r)) {
+    const d = M.deplace(champDe(ctx), groupe);
+    const ou = d.ou === 'fin' ? 'le groupe est déjà en tête : le voici déplacé à la fin' : 'avec le groupe déplacé en tête';
     return {
       id: 'deplace',
       titre: 'Test de déplacement',
-      texte: 'Voici la phrase avec le groupe déplacé en tête. Est-elle correcte, et dit-elle la même chose que ta phrase ?',
-      exemple: M.deplaceEnTete(jetons, groupe),
+      texte: `Voici ${ctx.proposition ? 'la proposition' : 'la phrase'} ; ${ou}. Est-elle correcte, et dit-elle la même chose ?`,
+      exemple: d.texte,
+      contexte: contexteProposition(ctx),
       reponses: [{ id: 'oui', texte: 'Oui' }, { id: 'non', texte: 'Non' }],
     };
   }
@@ -445,6 +486,18 @@ function questionPronom(ctx, r, mot) {
   return r.preposition === 'oui'
     ? conclusion('COI', 'complément d’objet indirect (COI)', ['Le pronom remplace un groupe introduit par une préposition.'])
     : conclusion('COD', 'complément d’objet direct (COD)', ['Le pronom remplace un groupe construit sans préposition.']);
+}
+
+// Mots sur lesquels portent les tests : la proposition du verbe (+ le groupe).
+const champDe = (ctx) => (ctx.proposition ? M.champ(ctx.jetons, ctx.proposition, ctx.groupe) : ctx.jetons);
+
+// Rappel affiché quand la proposition n'est qu'une partie de la phrase.
+function contexteProposition(ctx) {
+  if (!ctx.proposition) return null;
+  const c = champDe(ctx);
+  if (c.filter((j) => !j.ponct).length === ctx.jetons.filter((j) => !j.ponct).length) return null;
+  const mots = c.filter((j) => !M.estPonctuationFinale(j));
+  return `On fait le test dans la proposition du verbe ${cite(ctx.jetons, ctx.verbe)} : « ${recompose(mots).replace(/^[,;:]\s*/, '')} ».`;
 }
 
 function conclusion(fonction, nom, raisons, precision = null) {

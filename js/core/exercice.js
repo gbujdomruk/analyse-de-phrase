@@ -219,12 +219,13 @@ const article = (f) => ARTICLES[f] ?? FONCTIONS[f].nom;
 function explicationConfusion(c, prop, groupe, choisi) {
   const attendu = groupe.fonction;
   const premier = normalise(c.jetons[groupe.jetons[0]].texte);
-  const sansLui = M.supprime(c.jetons, groupe.jetons);
-  const enTete = M.deplaceEnTete(c.jetons, groupe.jetons);
+  const champ = M.champ(c.jetons, prop.jetons, groupe.jetons);
+  const sansLui = M.supprime(champ, groupe.jetons);
+  const enTete = M.deplace(champ, groupe.jetons).texte;
   const verbe = cite(c, prop.verbe.jetons);
 
   if (choisi === 'CC' && attendu !== 'CC') {
-    return `Fais les tests. Supprime le groupe : ${phrase(sansLui)}. Déplace-le en tête : ${phrase(enTete)}. Ces phrases sont-elles correctes et gardent-elles le même sens ? Si non, le groupe est lié au verbe : ce n’est pas un complément circonstanciel.`;
+    return `Fais les tests. Supprime le groupe : ${phrase(sansLui)}. Déplace-le : ${phrase(enTete)}. Ces phrases sont-elles correctes et gardent-elles le même sens ? Si non, le groupe est lié au verbe : ce n’est pas un complément circonstanciel.`;
   }
   if (attendu === 'CC') {
     return `Essaie de supprimer ce groupe : ${phrase(sansLui)}. Puis de le déplacer : ${phrase(enTete)}. Les deux phrases restent correctes : le groupe n’est pas lié au verbe.`;
@@ -388,7 +389,7 @@ export function aides(c, etape, item, niveau, trouves = []) {
       return [
         'Pour chaque groupe qui reste, essaie de le supprimer puis de le déplacer en tête de phrase.',
         `Il reste ${pluriel(item.cibles.length - trouves.length, 'complément')} à trouver. Regarde le groupe qui commence par « ${debut} ».`,
-        `Supprime-le : ${phrase(M.supprime(c.jetons, restant.jetons))}. Déplace-le : ${phrase(M.deplaceEnTete(c.jetons, restant.jetons))}. Ces phrases sont-elles correctes ?`,
+        `Supprime-le : ${phrase(M.supprime(M.champ(c.jetons, item.prop.jetons, restant.jetons), restant.jetons))}. Déplace-le : ${phrase(M.deplace(M.champ(c.jetons, item.prop.jetons, restant.jetons), restant.jetons).texte)}. Ces phrases sont-elles correctes ?`,
         { texte: `${cite(c, restant.jetons)} est ${article(restant.fonction)}.`, montre: restant.jetons },
       ];
     }

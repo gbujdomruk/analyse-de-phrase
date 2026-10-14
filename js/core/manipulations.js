@@ -58,11 +58,51 @@ export function supprime(jetons, indices) {
 }
 
 // « Le chat dort sur le canapé. » → « Sur le canapé, le chat dort. »
+// Dans une subordonnée, le groupe se place après le mot subordonnant :
+// « quand la cloche sonne le soir » → « Quand, le soir, la cloche sonne ».
 export function deplaceEnTete(jetons, indices) {
   const garde = new Set(indices);
   const groupe = jetons.filter((j) => garde.has(j.i) && !(j.ponct && j.texte === ','));
-  const reste = sansMajusculeInitiale(jetons.filter((j) => !garde.has(j.i)));
+  let reste = jetons.filter((j) => !garde.has(j.i));
+  const intro = reste.find((j) => !j.ponct);
+  const natures = intro ? analyses(intro.texte).map((a) => a.n) : [];
+  const subordonnant = natures.includes('conj.sub') || (intro?.i > 0 && natures.includes('pro.rel') && !natures.includes('pro.pers'));
+  if (subordonnant) {
+    reste = reste.filter((j) => j !== intro);
+    return majuscule(assemble([intro, ',', ...groupe, ',', ...reste]));
+  }
+  reste = sansMajusculeInitiale(reste);
   return majuscule(assemble([...groupe, ',', ...reste]));
+}
+
+// « Chaque matin, il promène son chien. » → « Il promène son chien chaque matin. »
+export function deplaceEnFin(jetons, indices) {
+  const garde = new Set(indices);
+  const groupe = sansMajusculeInitiale(jetons.filter((j) => garde.has(j.i) && !(j.ponct && j.texte === ',')));
+  const reste = jetons.filter((j) => !garde.has(j.i));
+  const fin = reste.length && estPonctuationFinale(reste.at(-1)) ? [reste.pop()] : [];
+  return majuscule(assemble([...reste, ...groupe, ...fin]));
+}
+
+// Test de déplacement : en tête, ou à la fin si le groupe y est déjà.
+export function deplace(jetons, indices) {
+  const tete = deplaceEnTete(jetons, indices);
+  const original = majuscule(assemble(jetons.filter((j) => !estPonctuationFinale(j))));
+  const memeTete = tete.replace(/[\s,.!?…]/g, '').toLowerCase() === original.replace(/[\s,.!?…]/g, '').toLowerCase();
+  return memeTete ? { texte: deplaceEnFin(jetons, indices), ou: 'fin' } : { texte: tete, ou: 'tete' };
+}
+
+// Les manipulations se font dans la proposition du verbe, pas dans toute la
+// phrase : « mais là, je suis égarée » → « Là, je suis égarée ».
+// `proposition` : indices des mots de la proposition ; on y ajoute le groupe
+// testé (une subordonnée complément est parfois hors de la proposition).
+export function champ(jetons, proposition, groupe = []) {
+  const ind = [...proposition, ...groupe].filter((i) => !jetons[i].ponct);
+  if (!ind.length) return jetons;
+  const min = Math.min(...ind);
+  const max = Math.max(...ind);
+  const derniereProposition = !jetons.slice(max + 1).some((j) => !j.ponct);
+  return jetons.filter((j) => (j.i >= min && j.i <= max) || (derniereProposition && j.i > max && estPonctuationFinale(j)));
 }
 
 // Question pour trouver le sujet : « Qui est-ce qui dort ? »
