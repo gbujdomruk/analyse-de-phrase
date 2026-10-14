@@ -27,7 +27,8 @@ function assemble(morceaux) {
     .replace(/,\s*,/g, ',')
     .replace(/,\s*([.…!?])/g, '$1')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/\s*[,;:]$/, '');
 }
 
 const majuscule = (s) => s.charAt(0).toUpperCase() + s.slice(1);

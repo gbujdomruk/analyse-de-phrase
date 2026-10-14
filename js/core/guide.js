@@ -282,6 +282,15 @@ export function verifieSelection(jetons, groupe, interdits = new Set()) {
   return null;
 }
 
+// Le groupe appartient-il à la proposition d'un autre verbe ? On accepte une
+// subordonnée entière (elle contient son propre verbe) : « Je crois [que Léa
+// viendra] ». Renvoie l'indice du verbe concerné, ou -1.
+export function autreProposition(groupe, propositions, verbes, k) {
+  const ind = groupe;
+  return propositions.findIndex((p, n) => n !== k && p && ind.every((i) => p.includes(i))
+    && !verbes[n].some((i) => ind.includes(i)));
+}
+
 // Prolonge une sélection à partir d'une préposition (jusqu'à la ponctuation,
 // une conjonction de coordination ou un mot déjà analysé) ou d'un déterminant
 // (jusqu'au nom).
@@ -546,7 +555,15 @@ function questionPronom(ctx, r, mot) {
 }
 
 // Mots sur lesquels portent les tests : la proposition du verbe (+ le groupe).
-const champDe = (ctx) => (ctx.proposition ? M.champ(ctx.jetons, ctx.proposition, ctx.groupe) : ctx.jetons);
+// Les connecteurs et modalisateurs déjà repérés sont retirés : ils sont hors
+// de la syntaxe et faussent le test (« J'en fais, précisément, pour… »).
+const champDe = (ctx) => {
+  const c = ctx.proposition ? M.champ(ctx.jetons, ctx.proposition, ctx.groupe) : ctx.jetons;
+  const hors = new Set((ctx.autres ?? []).filter((a) => a.fonction === 'MOD' || a.fonction === 'CONN').flatMap((a) => a.jetons));
+  if (!hors.size) return c;
+  // On retire aussi la virgule qui détachait le mot retiré.
+  return c.filter((j, n) => !hors.has(j.i) && !(j.texte === ',' && (hors.has(c[n - 1]?.i) || hors.has(c[n + 1]?.i))));
+};
 
 // Rappel affiché quand la proposition n'est qu'une partie de la phrase.
 function contexteProposition(ctx) {
@@ -601,12 +618,15 @@ export function questionExpansion(ctx, chemin) {
     return {
       id: 'complete',
       titre: 'Que complète ce groupe ?',
-      texte: 'Ce groupe complète-t-il un nom ou un adjectif ?',
+      texte: 'Ce groupe complète-t-il un nom (le chat [de la voisine], un chat [noir]) ou un adjectif (fier [de son travail], [très] grand) ?',
       reponses: [{ id: 'nom', texte: 'Un nom' }, { id: 'adj', texte: 'Un adjectif' }],
     };
   }
   if (r.complete === 'adj') {
-    return conclusion('CADJ', 'complément de l’adjectif', ['Le groupe complète un adjectif.', prep ? `Il est introduit par la préposition « ${premier.texte} ».` : '']);
+    const adverbe = groupe.length === 1 && naturesPossibles(premier.texte).includes('adv');
+    return conclusion('CADJ', 'complément de l’adjectif', adverbe
+      ? [`« ${premier.texte} » est un adverbe placé devant l’adjectif : il en précise le degré (très, peu, totalement…).`, 'Test : remplace-le par « très » ; il forme avec l’adjectif un groupe adjectival.']
+      : ['Le groupe complète un adjectif.', prep ? `Il est introduit par la préposition « ${premier.texte} ».` : '']);
   }
   if (detache && auNiveau('c4', ctx.niveau)) {
     return conclusion('APP', 'apposition', ['Le groupe est détaché du nom par une virgule.', 'On peut le supprimer sans changer ce que désigne le nom.']);

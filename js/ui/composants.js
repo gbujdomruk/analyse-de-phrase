@@ -67,10 +67,29 @@ export class PhraseInteractive {
     vide(this.racine);
     const phrase = this.marques.filter((m) => m.niveau !== 'groupe');
     const groupe = this.marques.filter((m) => m.niveau === 'groupe');
+    // Chaque mot est placé dans une « unité » avec la ponctuation qui le suit
+    // (et le guillemet ouvrant qui le précède) : une virgule ne peut pas se
+    // retrouver seule en début de ligne.
+    let ouvrante = null;
+    const consommes = new Set();
     for (const j of this.jetons) {
+      if (consommes.has(j.i)) continue;
       if (j.ponct) {
-        this.racine.append(el('span', { class: `ponct${j.avant === '' ? ' colle' : ''}` }, j.texte));
+        const signe = el('span', { class: 'ponct' }, j.texte);
+        if (/^[«(“\[]$/.test(j.texte)) {
+          ouvrante = el('span', { class: 'unite' }, signe);
+          this.racine.append(ouvrante);
+        } else this.racine.append(signe);
         continue;
+      }
+      // La ponctuation qui suit le mot s'affiche sur la même ligne que lui,
+      // collée à son texte : une virgule ne se retrouve jamais seule ni loin
+      // de son mot, même sous une étiquette large.
+      const suite = [];
+      for (const x of this.jetons.slice(j.i + 1)) {
+        if (!x.ponct || /^[«(“\[]$/.test(x.texte)) break;
+        suite.push(x);
+        consommes.add(x.i);
       }
       // Pour un mot inclus dans plusieurs groupes (subordonnée COD qui contient
       // un sujet), on affiche le groupe le plus petit.
@@ -94,10 +113,12 @@ export class PhraseInteractive {
         'aria-pressed': this.selection.has(j.i) ? 'true' : 'false',
         disabled: !this.actif || null,
         onclick: () => this.bascule(j.i),
-      }, el('span', { class: 'texte-mot' }, j.texte));
+      }, el('span', { class: 'ligne-mot' }, el('span', { class: 'texte-mot' }, j.texte),
+        ...suite.map((x) => el('span', { class: `ponct${x.avant === '' ? ' colle' : ''}`, 'aria-hidden': 'true' }, x.texte))));
       if (premier(m)) bouton.append(el('span', { class: 'etiquette' }, m.libelle));
       else if (premier(e)) bouton.append(el('span', { class: 'etiquette etiquette-x' }, e.libelle));
-      this.racine.append(bouton);
+      if (ouvrante) ouvrante.append(bouton); else this.racine.append(bouton);
+      ouvrante = null;
     }
   }
 }

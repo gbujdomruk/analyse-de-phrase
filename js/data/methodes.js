@@ -41,6 +41,7 @@ export const METHODES = {
       'Un groupe introduit par une préposition qui précise le nom est complément du nom (« le chat de la voisine »).',
       'Une proposition qui commence par un pronom relatif (qui, que, dont, où) et complète le nom est épithète du nom (relative).',
       'Un élément détaché par une virgule est en apposition (« Léa, ma voisine, est partie »).',
+      'Un adverbe placé devant un adjectif (très, peu, totalement) en précise le degré : il est complément de l’adjectif (« totalement égarée »).',
     ],
   },
   natures: {

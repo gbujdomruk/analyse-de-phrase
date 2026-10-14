@@ -285,6 +285,8 @@ class Analyse {
     const v = M.texteVerbe(this.jetons, verbe);
     this.ouvre('Compléments', `Compléments du verbe « ${v} » : sélectionne un groupe, puis lance les tests.`, METHODES.complements.etapes);
     this.phrase.surligner(verbe);
+    // On colore la proposition du verbe pour rappeler où chercher.
+    if (this.verbes.length > 1 && this.propositions?.[k]) this.phrase.teinter([this.propositions[k]]);
     this.afficheRestants();
 
     const analyser = () => {
@@ -293,6 +295,10 @@ class Analyse {
       if (groupe.some((i) => verbe.includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient le verbe : sélectionne seulement le complément.'));
       if (groupe.length && groupe.every((i) => sujet.includes(i))) return remplit(this.retour, bulle('faux', 'C’est le sujet : tu l’as déjà analysé.'));
       if (groupe.some((i) => this.groupes.some((g) => g.jetons.includes(i)))) return remplit(this.retour, bulle('faux', 'Une partie de ta sélection a déjà été analysée.'));
+      const ailleurs = this.propositions ? G.autreProposition(groupe.filter((i) => !this.jetons[i].ponct), this.propositions, this.verbes, k) : -1;
+      if (ailleurs >= 0) {
+        return remplit(this.retour, bulle('attention', `Ce groupe appartient à la proposition du verbe « ${M.texteVerbe(this.jetons, this.verbes[ailleurs])} » : il ne complète pas « ${v} ». Tu l’analyseras avec son verbe.`));
+      }
       const interdits = new Set([...this.verbes.flat(), ...sujet, ...this.groupes.flatMap((g) => g.jetons)]);
       if (this.selectionIncomplete(groupe, interdits)) return;
       const proposition = this.propositions?.[k] ?? null;
@@ -367,7 +373,7 @@ class Analyse {
   // --- 5. Groupe nominal ---------------------------------------------------------------------
 
   etapeExpansions() {
-    this.ouvre('Groupe nominal', 'Sélectionne un mot ou un groupe qui complète un nom (ou un adjectif), puis lance les tests.', METHODES.expansions.etapes);
+    this.ouvre('Groupe nominal', 'Sélectionne un mot ou un groupe qui complète un nom ou un adjectif (adjectif, groupe introduit par une préposition, relative, adverbe comme « très »), puis lance les tests.', METHODES.expansions.etapes);
     const analyser = () => {
       const groupe = this.phrase.valeur();
       if (groupe.some((i) => this.verbes.flat().includes(i))) return remplit(this.retour, bulle('faux', 'Ta sélection contient un verbe conjugué : une expansion du nom est un adjectif, un groupe prépositionnel ou une relative entière.'));

@@ -150,3 +150,16 @@ test('délimitation des propositions : emboîtement, inversion, coordination', (
   assert.deepEqual(props("J'aime le chat qui dort et qui ronronne.", [[1], [5], [8]]), ["J' aime le chat", 'qui dort', 'qui ronronne']);
   assert.deepEqual(props('Il pleut et les enfants jouent dans le salon.', [[1], [5]]), ['Il pleut', 'les enfants jouent dans le salon']);
 });
+
+test('groupe d\'une autre proposition et connecteur retiré du test', () => {
+  const j = D("J'en fais, précisément, pour m'entraîner, mais là, je suis totalement égarée");
+  const props = G.delimitePropositions(j, [[2], [14]]);
+  assert.equal(G.autreProposition([11], props, [[2], [14]], 0), 1);
+  assert.equal(G.autreProposition([6, 7, 8], props, [[2], [14]], 0), -1);
+  const k = D('Je crois que Léa viendra demain.');
+  const pk = G.delimitePropositions(k, [[1], [4]]);
+  assert.equal(G.autreProposition([2, 3, 4, 5], pk, [[1], [4]], 0), -1); // subordonnée COD entière
+  const ctx = { jetons: j, verbe: [2], sujet: [0], groupe: [6, 7, 8], proposition: props[0], niveau: 'c3', autres: [{ fonction: 'CONN', jetons: [4] }] };
+  assert.equal(G.questionSuivante(ctx, [{ question: 'supprime', reponse: 'oui' }]).exemple, "Pour m'entraîner, j'en fais");
+  assert.equal(G.premiereQuestion(ctx).exemple, "J'en fais");
+});

@@ -161,13 +161,16 @@ main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; outline: none;
 
 /* --- Phrase interactive --- */
 .phrase {
-  display: flex; flex-wrap: wrap; align-items: flex-start; row-gap: 6px; column-gap: 2px;
+  /* stretch : tous les mots d'une ligne ont la même hauteur, donc les
+     soulignements des groupes restent alignés même sous une étiquette. */
+  display: flex; flex-wrap: wrap; align-items: stretch; row-gap: 6px; column-gap: 2px;
   padding: 12px 12px 14px; margin: 8px 0; background: var(--surface);
   border: 1px solid var(--bord); border-radius: var(--rayon);
   font-size: 1.3rem;
 }
+.unite { display: inline-flex; align-items: stretch; }
 .mot {
-  position: relative; display: inline-flex; flex-direction: column; align-items: flex-start;
+  position: relative; display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
   min-height: 46px; padding: 6px 6px 4px; margin-left: 4px;
   font: inherit; color: var(--texte); background: transparent;
   border: 0; border-bottom: 4px solid transparent; border-radius: 8px 8px 2px 2px;
@@ -189,6 +192,9 @@ main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; outline: none;
 .legende-prop { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
 .ponct { align-self: flex-start; padding: 6px 2px; font-size: 1.3rem; }
 .ponct.colle { margin-left: -6px; }
+.ligne-mot { display: inline-flex; align-items: baseline; white-space: nowrap; }
+.ligne-mot .ponct { padding: 0 0 0 4px; font-size: inherit; color: var(--texte); }
+.ligne-mot .ponct.colle { margin-left: 0; padding-left: 1px; }
 .etiquette {
   display: block; margin-top: 3px;
   font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;
