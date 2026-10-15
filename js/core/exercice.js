@@ -455,8 +455,8 @@ export function aides(c, etape, item, niveau, trouves = []) {
       ];
     case 'groupes':
       return [
-        'Regarde le premier mot du groupe, puis cherche le mot autour duquel il est construit.',
-        GROUPES[item.nature.code].aide,
+        'Regarde le premier mot du groupe, puis cherche le mot autour duquel il est construit. Attention : « au, aux, du, des » contiennent une préposition (au = à + le).',
+        `${GROUPES[item.nature.code].aide}${item.nature.code === 'GP' ? ' Son noyau est le mot introduit par la préposition, pas la préposition elle-même.' : ''}`,
         { texte: `Réponse : ${GROUPES[item.nature.code].nom.toLowerCase()}${item.nature.noyau !== null && item.nature.noyau !== undefined ? `, de noyau « ${c.jetons[item.nature.noyau].texte} »` : ''}.`, montre: item.nature.noyau !== null && item.nature.noyau !== undefined ? [item.nature.noyau] : [] },
       ];
     case 'phrase':
@@ -577,6 +577,9 @@ export function verifiePredicat(c, item, selection) {
   return faux('Ta sélection contient des mots qui ne font pas partie du prédicat.');
 }
 
+// Articles contractés : ils contiennent une préposition.
+const CONTRACTIONS = { au: 'à + le', aux: 'à + les', du: 'de + le', des: 'de + les' };
+
 // --- Nature des groupes ------------------------------------------------------------------------
 
 const natureMot = (c) => (i) => natureDuJeton(c, i);
@@ -603,8 +606,11 @@ export function verifieGroupe(c, item, code) {
   const attendu = item.nature.code;
   if (code === attendu) return juste(`Oui : ${item.nature.raison}`);
   const premier = c.jetons[sansPonct(c, item.groupe.jetons)[0]].texte;
+  const contraction = CONTRACTIONS[normalise(premier)];
   const indices = {
-    GP: `Regarde le premier mot du groupe, « ${premier} » : quelle est sa nature ?`,
+    GP: contraction
+      ? `Le premier mot, « ${premier} », est la contraction de « ${contraction} » : il contient la préposition « ${contraction.split(' ')[0]} ». Un groupe qui commence par une préposition est un groupe prépositionnel.`
+      : `Regarde le premier mot du groupe, « ${premier} » : quelle est sa nature ?`,
     GN: 'Cherche autour de quel mot le groupe est construit : est-ce un nom ?',
     GAdj: 'Le groupe est construit autour d’un mot qui donne une qualité : de quelle nature est-il ?',
     GAdv: 'Le groupe est formé d’un mot invariable qui précise un verbe ou la phrase.',
@@ -619,8 +625,13 @@ export function verifieNoyau(c, item, i) {
   const n = item.nature.noyau;
   if (i === n) return juste(`Oui : le noyau est « ${c.jetons[n].texte} ».`);
   const choisi = c.jetons[i].texte;
-  if (item.nature.code === 'GP' && natureDuJeton(c, i) && categorie(natureDuJeton(c, i)) === 'prep') {
-    return faux('Dans un groupe prépositionnel, le noyau est le mot introduit par la préposition (un nom, un pronom ou un infinitif).');
+  // Dans un groupe prépositionnel, le mot qui introduit le groupe (« dans »,
+  // ou « au » = à + le) n'est pas le noyau.
+  const introducteur = sansPonct(c, item.groupe.jetons).slice(0, 3).filter((k) => k < n)
+    .some((k) => k === i && (categorie(natureDuJeton(c, k) ?? '') === 'prep' || CONTRACTIONS[normalise(c.jetons[k].texte)]));
+  if (item.nature.code === 'GP' && introducteur) {
+    const contraction = CONTRACTIONS[normalise(choisi)];
+    return faux(`${contraction ? `« ${choisi} » (= ${contraction})` : `« ${choisi} »`} introduit le groupe : ce n’est pas le noyau. Dans un groupe prépositionnel, le noyau est le mot introduit par la préposition (un nom, un pronom ou un infinitif) : lequel est-ce ?`);
   }
   return faux(`Essaie de supprimer « ${choisi} » : le groupe garde-t-il sa construction ? Le noyau est le mot qu’on ne peut pas supprimer, celui qui donne sa nature au groupe.`);
 }

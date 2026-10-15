@@ -178,3 +178,15 @@ test('adverbe de degré et adjectif forment un groupe à l\'étape des compléme
   const l = D('Elle est vraiment très contente.');
   assert.deepEqual(G.verifieSelection(l, [4], new Set([1])).suggestion, [2, 3, 4]);
 });
+
+test('groupe prépositionnel introduit par « au » : message sur la contraction et le noyau', async () => {
+  const { PHRASES } = await import('../js/data/phrases.js');
+  const { construitCorrige } = await import('../js/core/notation.js');
+  const { estMotCompose } = await import('../js/core/lexique.js');
+  const E = await import('../js/core/exercice.js');
+  const c = construitCorrige(PHRASES.find((p) => p.id === 'gateau-chocolat'), estMotCompose);
+  const item = E.creeExercice(c, 'groupes', 'c4').etapes.find((e) => e.type === 'groupes').items.find((it) => it.groupe.fonction === 'CN');
+  assert.match(E.verifieGroupe(c, item, 'GN').message, /contraction de « à \+ le »/);
+  assert.match(E.verifieNoyau(c, item, 2).message, /introduit le groupe : ce n’est pas le noyau/);
+  assert.equal(E.verifieNoyau(c, item, 3).statut, 'juste');
+});
