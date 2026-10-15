@@ -4,6 +4,9 @@
 //   natures : un code par mot (ponctuation exclue), « = » pour prolonger
 //             le mot précédent (verbe composé, locution).
 // niveau : niveau minimal (c3, c4, lycee) ; themes : points travaillés.
+// type, formes : type et formes de phrase, si on veut les imposer (sinon
+//   l'application les calcule) ; seulement : thèmes où la phrase apparaît
+//   (pour une phrase qui ne sert qu'à un point précis).
 
 export const PHRASES = [
   // ---------- Cycle 3 ----------
@@ -176,7 +179,59 @@ export const PHRASES = [
     note: '« au » est un article défini contracté (à + le).',
   },
 
+  {
+    id: 'chien-nuit',
+    niveau: 'c3',
+    themes: ['complements', 'natures'],
+    analyse: "[S Le chien] n'[V aboie] jamais [CC:temps la nuit].",
+    natures: 'det.def nom.c adv verbe adv det.def nom.c',
+    note: 'Phrase de forme négative : la négation « ne… jamais » encadre le verbe.',
+  },
+  {
+    id: 'touche-plat',
+    niveau: 'c3',
+    themes: ['complements', 'sujet'],
+    analyse: 'Ne [V touche] pas [COI à ce plat] !',
+    natures: 'adv verbe adv prep det.dem nom.c',
+    note: 'Type impératif, formes négative et exclamative : les formes s’ajoutent au type.',
+  },
+  {
+    id: 'match-gagne',
+    niveau: 'c3',
+    themes: ['verbe'],
+    analyse: '[S Les enfants] [V ont gagné] [COD le match] !',
+    natures: 'det.def nom.c verbe = det.def nom.c',
+  },
+
   // ---------- Cycle 4 ----------
+  {
+    id: 'viendras-tu',
+    niveau: 'c4',
+    themes: ['sujet', 'complements'],
+    analyse: 'Ne [V viendras]-[S tu] pas [CC:accompagnement avec nous] ?',
+    natures: 'adv verbe pro.pers adv prep pro.pers',
+    note: 'Type interrogatif, forme négative.',
+  },
+  {
+    id: 'emphase-frere',
+    niveau: 'c4',
+    themes: ['phrase'],
+    seulement: ['phrase'],
+    analyse: "C'est mon frère qui a gagné la course.",
+    type: 'declaratif',
+    formes: ['emphatique'],
+    note: 'Forme emphatique par extraction : le sujet « mon frère » est encadré par « c’est… qui » (phrase de base : « Mon frère a gagné la course »).',
+  },
+  {
+    id: 'emphase-detachement',
+    niveau: 'c4',
+    themes: ['phrase'],
+    seulement: ['phrase'],
+    analyse: 'Ton frère, il est déjà parti ?',
+    type: 'interrogatif',
+    formes: ['emphatique'],
+    note: 'Forme emphatique par détachement : « ton frère » est placé en tête puis repris par le pronom « il ».',
+  },
   {
     id: 'souris-chat',
     niveau: 'c4',
@@ -255,6 +310,26 @@ export const PHRASES = [
   },
 
   // ---------- Lycée ----------
+  {
+    id: 'impersonnelle-accident',
+    niveau: 'lycee',
+    themes: ['phrase'],
+    seulement: ['phrase'],
+    analyse: 'Il est arrivé un accident.',
+    type: 'declaratif',
+    formes: ['impersonnelle'],
+    note: 'Forme impersonnelle : « il » ne désigne rien, et la phrase équivaut à « Un accident est arrivé ».',
+  },
+  {
+    id: 'pleut-matin',
+    niveau: 'lycee',
+    themes: ['phrase'],
+    seulement: ['phrase'],
+    analyse: 'Il pleut depuis ce matin.',
+    type: 'declaratif',
+    formes: [],
+    note: 'Le verbe « pleuvoir » est impersonnel, mais la phrase n’est pas de forme impersonnelle : aucune phrase personnelle ne lui correspond (terminologie 2020, II.1.8.5).',
+  },
   {
     id: 'faut-partes',
     niveau: 'lycee',

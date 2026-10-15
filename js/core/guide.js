@@ -4,7 +4,7 @@
 // certaine à partir de ses réponses. Le dictionnaire sert à signaler les
 // incohérences (un mot qui ne peut pas être un verbe, un accord impossible).
 
-import { INTRODUCTEURS_PREPOSITIONNELS, LOCUTIONS, MOTS_OUTILS } from '../data/mots-outils.js';
+import { INTRODUCTEURS_PREPOSITIONNELS, LOCUTIONS, MOTS_OUTILS, VERBES_EN_ETRE } from '../data/mots-outils.js';
 import { VERBES_ATTRIBUTIFS, CIRCONSTANCES, auNiveau } from '../data/terminologie.js';
 import { analyses, formesConjuguees, formesNonConjuguees, lemmesVerbaux, naturesPossibles } from './lexique.js';
 import { normalise, recompose } from './decoupage.js';
@@ -53,13 +53,6 @@ function rattacheAuxiliaire(jetons, verbe, i) {
   return lie && auxiliaire && participe;
 }
 
-// Verbes qui forment leurs temps composés avec « être » (je suis parti).
-const VERBES_EN_ETRE = new Set([
-  'aller', 'venir', 'revenir', 'devenir', 'redevenir', 'parvenir', 'survenir', 'intervenir', 'advenir',
-  'partir', 'repartir', 'arriver', 'naître', 'mourir', 'décéder', 'rester', 'tomber', 'retomber',
-  'entrer', 'rentrer', 'sortir', 'ressortir', 'monter', 'remonter', 'descendre', 'redescendre',
-  'retourner', 'passer', 'repasser', 'apparaître',
-]);
 const PRONOMS_REFLECHIS = new Set(['me', "m'", 'te', "t'", 'se', "s'", 'nous', 'vous']);
 
 // « être » + participe passé d'un verbe qui ne se conjugue pas avec « être » :
@@ -123,7 +116,7 @@ export function remarquesVerbes(jetons, selection) {
 
 // --- Propositions ------------------------------------------------------------------
 
-const estSubordonnant = (j) => {
+export const estSubordonnant = (j) => {
   const n = naturesPossibles(j.texte);
   return !j.ponct && n.some((x) => x === 'conj.sub' || x === 'pro.rel') && !n.includes('pro.pers');
 };

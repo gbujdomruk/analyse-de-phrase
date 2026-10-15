@@ -87,14 +87,22 @@ a { color: var(--accent); }
 /* --- En-tête --- */
 .entete {
   position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; align-items: center; gap: 8px;
   padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
   background: var(--surface); border-bottom: 1px solid var(--bord);
 }
-.logo { font-weight: 700; text-decoration: none; color: var(--texte); white-space: nowrap; }
+.lien-reglages { margin-left: auto; font-size: 1.4rem; text-decoration: none; color: var(--texte-doux); padding: 4px 8px; }
+.reglage { border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--surface); padding: 12px 16px; }
+.reglage legend { font-weight: 700; padding: 0 6px; }
+.option-reglage { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; cursor: pointer; }
+.option-reglage input { margin-top: 5px; width: 20px; height: 20px; }
+.option-reglage strong { display: block; }
+.option-reglage small { color: var(--texte-doux); }
+.logo { font-weight: 700; text-decoration: none; color: var(--texte); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.niveau { flex: 0 1 auto; min-width: 0; }
 .niveau select {
   font: inherit; font-size: 0.9rem; padding: 6px 8px; border-radius: 8px;
-  border: 1px solid var(--bord); background: var(--surface); color: var(--texte); max-width: 52vw;
+  border: 1px solid var(--bord); background: var(--surface); color: var(--texte); max-width: 46vw;
 }
 
 main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; outline: none; }
@@ -218,6 +226,11 @@ main { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; outline: none;
 .choix-liste.colonnes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .choix-liste.colonnes .bouton-choix { min-height: 52px; }
 .choix.en-attente .bouton-choix { opacity: 0.6; }
+.bouton-choix[aria-pressed="true"] { background: var(--accent-doux); border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.champ-texte { font: inherit; font-size: 1.1rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--bord); background: var(--surface); color: var(--texte); min-height: 46px; flex: 1 1 180px; }
+.structure { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; font-size: 0.9rem; }
+.structure span { padding: 4px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--bord); }
+.structure strong { display: block; font-size: 0.7rem; text-transform: uppercase; color: var(--texte-doux); }
 
 /* --- Retours --- */
 .retour:empty { display: none; }

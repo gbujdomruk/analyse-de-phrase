@@ -1,15 +1,21 @@
 // Mode « S'entraîner » : phrases de la banque, corrigées pas à pas.
 
 import { PHRASES } from '../data/phrases.js';
-import { FONCTIONS, CIRCONSTANCES, PROPOSITIONS, NATURES, naturesProposees, natureAuNiveau, categorie, auNiveau } from '../data/terminologie.js';
+import {
+  FONCTIONS, CIRCONSTANCES, PROPOSITIONS, NATURES, GROUPES, TYPES_PHRASE, FORMES_PHRASE,
+  naturesProposees, natureAuNiveau, categorie, auNiveau,
+} from '../data/terminologie.js';
 import { construitCorrige, texteDe } from '../core/notation.js';
-import { estMotCompose } from '../core/lexique.js';
+import { estMotCompose, chargeLexique } from '../core/lexique.js';
 import {
   THEMES, TITRES_ETAPES, phrasesDuTheme, creeExercice, verifieVerbes, verifieSujet,
   verifieComplement, verifieCirconstance, circonstancesProposees, verifieExpansion,
   verifieProposition, typesPropositions, verifieNature, aides, fonctionsProposees, libelleNature,
+  verifiePredicat, predicatDe,
+  groupesProposes, verifieGroupe, verifieNoyau, verifieType, verifieFormes, typeFormesDe,
 } from '../core/exercice.js';
-import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, etapes, melange } from './composants.js';
+import { demandeIdentite } from './questions.js';
+import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, choixMultiple, etapes, melange, reglages } from './composants.js';
 
 export function ecranThemes(racine, niveau) {
   remplit(racine, 
@@ -23,8 +29,14 @@ export function ecranThemes(racine, niveau) {
   );
 }
 
-export function ecranExercice(racine, niveau, theme) {
+export async function ecranExercice(racine, niveau, theme) {
   if (!THEMES[theme]) { location.hash = '#/entrainement'; return; }
+  // Le dictionnaire sert à l'identité du verbe et au découpage des mots composés.
+  remplit(racine, bulle('info', 'Chargement du dictionnaire…'));
+  try { await chargeLexique(); } catch (e) {
+    remplit(racine, bulle('faux', `Le dictionnaire n’a pas pu être chargé (${e.message}). Vérifie ta connexion et réessaie.`));
+    return;
+  }
   const phrases = melange(phrasesDuTheme(PHRASES, theme, niveau));
   new Seance(racine, niveau, theme, phrases).phraseSuivante();
 }
@@ -39,7 +51,7 @@ class Seance {
     if (this.rang >= this.phrases.length) return this.fin();
     const entree = this.phrases[this.rang];
     this.corrige = construitCorrige(entree, estMotCompose);
-    this.ex = creeExercice(this.corrige, this.theme, this.niveau);
+    this.ex = creeExercice(this.corrige, this.theme, this.niveau, { vocabulaire: reglages.vocabulaire });
     this.etape = 0;
     this.item = 0;
     this.erreurs = 0;
@@ -153,13 +165,64 @@ class Seance {
       const r = verifieExpansion(this.corrige, item, this.phrase.valeur(), f.code, this.trouves);
       if (r.statut !== 'juste') return this.affiche(r);
       this.trouves.push(r.groupe);
-      this.phrase.marque({ jetons: r.groupe.jetons, fonction: r.groupe.fonction, libelle: FONCTIONS[r.groupe.fonction].abrege, niveau: 'groupe' });
+      this.phrase.marque({ jetons: r.groupe.jetons, fonction: r.groupe.fonction, libelle: this.niveau === 'c3' ? FONCTIONS.EXP.abrege : FONCTIONS[r.groupe.fonction].abrege, niveau: 'groupe' });
       this.phrase.efface();
       this.aide.charge(aides(this.corrige, this.etapeCourante, item, this.niveau, this.trouves));
       majConsigne();
       if (this.trouves.length === item.cibles.length) this.termineItem(r.message);
       else remplit(this.retour, bulle('juste', r.message));
     });
+  }
+
+  etape_identite(item) {
+    const v = texteDe(this.corrige.jetons, item.prop.verbe.jetons);
+    this.phrase.active(false);
+    this.phrase.surligner(item.prop.verbe.jetons);
+    demandeIdentite(this, item.identite, v, this.niveau, (r) => this.affiche(r), (r) => this.affiche(r, () => {}));
+  }
+
+  etape_predicat(item) {
+    const v = texteDe(this.corrige.jetons, item.prop.verbe.jetons);
+    this.consigne.textContent = `Sélectionne le prédicat de la proposition du verbe « ${v} » : ce que l’on dit du sujet.`;
+    this.boutonsSelection(() => this.affiche(verifiePredicat(this.corrige, item, this.phrase.valeur()), () => {}));
+  }
+
+  etape_groupes(item) {
+    const c = this.corrige;
+    this.phrase.active(false);
+    this.phrase.surligner(item.groupe.jetons);
+    this.consigne.textContent = `Quelle est la nature du groupe « ${texteDe(c.jetons, item.groupe.jetons)} » ? (${this.item + 1} / ${this.etapeCourante.items.length})`;
+    remplit(this.actions, choix(null, groupesProposes(), (g) => {
+      const r = verifieGroupe(c, item, g.code);
+      if (r.statut !== 'juste') return this.affiche(r);
+      if (!item.demandeNoyau) return this.affiche(r, () => {});
+      // Noyau : l'élève touche le mot principal du groupe.
+      remplit(this.retour, bulle('juste', r.message));
+      this.consigne.textContent = `Quel est le noyau du groupe « ${texteDe(c.jetons, item.groupe.jetons)} » ? Touche-le.`;
+      this.phrase.active(true);
+      this.boutonsSelection(() => {
+        const sel = this.phrase.valeur();
+        if (sel.length !== 1) return this.affiche({ statut: 'faux', message: 'Le noyau est un seul mot : touche un seul mot.' });
+        if (!item.groupe.jetons.includes(sel[0])) return this.affiche({ statut: 'faux', message: 'Le noyau fait partie du groupe surligné.' });
+        this.affiche(verifieNoyau(c, item, sel[0]), () => {});
+      });
+    }, { colonnes: true }));
+  }
+
+  etape_phrase(item) {
+    this.phrase.active(false);
+    this.consigne.textContent = 'De quel type est cette phrase ?';
+    remplit(this.actions, choix(null, Object.entries(TYPES_PHRASE).map(([code, t]) => ({ code, nom: t.nom, definition: t.aide })), (t) => {
+      const r = verifieType(item, t.code);
+      if (r.statut !== 'juste') return this.affiche(r);
+      const formes = Object.keys(item.attendu.formes);
+      if (!formes.length) return this.affiche(r, () => {});
+      remplit(this.retour, bulle('juste', r.message));
+      this.consigne.textContent = 'Quelles sont ses formes ? Coche toutes celles qui conviennent.';
+      remplit(this.actions, choixMultiple(null, formes.map((f) => ({ code: f, nom: FORMES_PHRASE[f].nom, definition: FORMES_PHRASE[f].aide })),
+        (choisies) => this.affiche(verifieFormes(item, choisies), () => {}),
+        { aucun: 'Aucune (phrase de base)' }));
+    }));
   }
 
   etape_propositions(item) {
@@ -244,6 +307,12 @@ class Seance {
       for (const p of c.propositions) if (p.verbe && p.conjuguee) this.phrase.marque({ jetons: p.verbe.jetons, fonction: 'V', libelle: 'Verbe' });
     }
     if (etape.type === 'sujets' && item.prop.sujet) this.phrase.marque({ jetons: item.prop.sujet.jetons, fonction: 'S', libelle: 'Sujet' });
+    if (etape.type === 'fonctions') {
+      for (const g of item.cibles) this.phrase.marque({ jetons: g.jetons, fonction: g.fonction, libelle: libelleGroupe(g, this.niveau) });
+    }
+    if (etape.type === 'expansions') {
+      for (const g of item.cibles) this.phrase.marque({ jetons: g.jetons, fonction: g.fonction, libelle: FONCTIONS[g.fonction].abrege, niveau: 'groupe' });
+    }
   }
 
   // --- Fin de phrase ------------------------------------------------------------------
@@ -251,7 +320,12 @@ class Seance {
   bilan() {
     if (this.erreurs === 0) this.reussites++;
     const c = this.corrige;
-    const ligne = (groupe, fonction) => el('tr', {}, el('td', {}, texteDe(c.jetons, groupe.jetons)), el('td', {}, fonction));
+    // Nature des groupes, si l'étape a été faite.
+    const natures = new Map((this.ex.etapes.find((e) => e.type === 'groupes')?.items ?? []).map((it) => [it.groupe.jetons.join(), it.nature.code]));
+    const ligne = (groupe, fonction) => {
+      const n = natures.get(groupe.jetons.join());
+      return el('tr', {}, el('td', {}, texteDe(c.jetons, groupe.jetons)), el('td', {}, fonction, n ? el('small', {}, ` — ${GROUPES[n].nom.toLowerCase()}`) : null));
+    };
     const lignes = c.propositions.flatMap((p) => [
       c.propositions.length > 1
         ? el('tr', { class: 'ligne-prop' }, el('td', { colspan: '2' }, `${PROPOSITIONS[p.type].nom} : « ${texteDe(c.jetons, p.jetonsPropres)} »`))
@@ -264,13 +338,17 @@ class Seance {
     const tableau = el('table', { class: 'tableau-bilan' },
       el('thead', {}, el('tr', {}, el('th', {}, 'Groupe'), el('th', {}, 'Fonction'))),
       el('tbody', {}, ...lignes, ...expansions));
-    const natures = c.natures && this.ex.etapes.some((e) => e.type === 'natures')
+    const naturesMots = c.natures && this.ex.etapes.some((e) => e.type === 'natures')
       ? el('p', { class: 'natures-bilan' }, c.natures.map((u) => el('span', {}, el('strong', {}, u.texte), ` ${NATURES[natureAuNiveau(u.nature, this.niveau)]?.nom.toLowerCase() ?? u.nature}`)))
       : null;
     remplit(this.consigne, this.erreurs === 0 ? 'Parfait, sans erreur !' : `Phrase terminée (${this.erreurs} erreur${this.erreurs > 1 ? 's' : ''} corrigée${this.erreurs > 1 ? 's' : ''}).`);
     vide(this.zoneEtapes);
     this.aide.racine.hidden = true;
-    remplit(this.retour, tableau, natures, c.note ? bulle('info', c.note) : null);
+    const tf = typeFormesDe(c, this.niveau);
+    const formes = Object.keys(tf.formes).filter((f) => tf.formes[f]).map((f) => FORMES_PHRASE[f].nom.toLowerCase());
+    const typeFormes = el('p', { class: 'petit' }, `Phrase de type ${TYPES_PHRASE[tf.type].nom.toLowerCase()}${formes.length ? `, de forme ${formes.join(' et ')}` : ''}.`);
+    remplit(this.retour, ...c.propositions.filter((p) => p.verbe && !p.type.startsWith('SUB')).map((p) => structure(c, p)),
+      tableau, naturesMots, typeFormes, c.note ? bulle('info', c.note) : null);
     remplit(this.actions, el('button', { type: 'button', class: 'bouton bouton-principal', onclick: () => this.phraseSuivante() },
       this.rang + 1 < this.phrases.length ? 'Phrase suivante →' : 'Terminer'));
   }
@@ -284,6 +362,18 @@ class Seance {
         el('button', { type: 'button', class: 'bouton bouton-secondaire', onclick: () => ecranExercice(this.racine, this.niveau, this.theme) }, 'Recommencer')),
     );
   }
+}
+
+// Structure de la proposition : GS + GV (+ GC), ou sujet + prédicat
+// (+ complément de phrase) selon le vocabulaire choisi dans les réglages.
+function structure(c, p) {
+  const predicat = reglages.vocabulaire === 'predicat';
+  const cc = p.complements.filter((g) => g.fonction === 'CC');
+  const bloc = (titre, indices) => (indices.length ? el('span', {}, el('strong', {}, titre), texteDe(c.jetons, indices)) : null);
+  return el('p', { class: 'structure' },
+    bloc(predicat ? 'Sujet' : 'Groupe sujet', p.sujet?.jetons ?? []),
+    bloc(predicat ? 'Prédicat' : 'Groupe verbal', predicatDe(c, p)),
+    ...cc.map((g) => bloc(predicat ? 'Complément de phrase' : 'Complément circonstanciel', g.jetons)));
 }
 
 // Libellé abrégé sous les mots (« CC temps »), complet dans le bilan.

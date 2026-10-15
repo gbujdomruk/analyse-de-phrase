@@ -156,3 +156,12 @@ export const INTRODUCTEURS_PREPOSITIONNELS = new Set([
   ...Object.keys(entrees).filter((m) => entrees[m].some((e) => e.n === 'prep')),
   'au', 'aux',
 ]);
+
+// Verbes qui forment leurs temps composés avec « être » (je suis parti) :
+// « être » + participe n'y est pas une voix passive.
+export const VERBES_EN_ETRE = new Set([
+  'aller', 'venir', 'revenir', 'devenir', 'redevenir', 'parvenir', 'survenir', 'intervenir', 'advenir',
+  'partir', 'repartir', 'arriver', 'naître', 'mourir', 'décéder', 'rester', 'tomber', 'retomber',
+  'entrer', 'rentrer', 'sortir', 'ressortir', 'monter', 'remonter', 'descendre', 'redescendre',
+  'retourner', 'passer', 'repasser', 'apparaître',
+]);

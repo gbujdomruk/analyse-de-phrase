@@ -13,9 +13,10 @@ apposition, complément de l'adjectif.
 
 ## Deux modes
 
-**S'entraîner** : des phrases corrigées, classées par thème (le verbe, le
-sujet, les compléments, le groupe nominal, les natures, les propositions,
-l'analyse complète). La correction est exacte puisque chaque phrase a un
+**S'entraîner** : des phrases corrigées, classées par thème (le verbe et son
+identité, le sujet, les compléments, le groupe nominal, la nature des groupes
+et leur noyau, la nature des mots, les propositions, les types et formes de
+phrase, l'analyse complète). La correction est exacte puisque chaque phrase a un
 corrigé. En cas d'erreur, l'élève reçoit une explication qui ne donne pas la
 réponse mais lui fait faire le bon test (« Supprime le groupe : *Le chat
 dort.* La phrase reste-t-elle correcte ? »). Le bouton « Je suis bloqué·e »
@@ -34,7 +35,23 @@ l'élève et en tire les conclusions.
   un accord sujet-verbe impossible, les natures possibles d'un mot.
 
 Le **niveau** (cycle 3, cycle 4, lycée) se règle en haut de l'écran : il
-détermine les fonctions, les natures et les sens de compléments proposés.
+détermine les fonctions, les natures, les temps, les formes de phrase et les
+sens de compléments proposés. Au cycle 3, on demande « expansion du nom » sans
+distinguer épithète et complément du nom.
+
+L'écran **Réglages** (roue dentée) permet de choisir le vocabulaire de la
+phrase : « groupe sujet, groupe verbal, complément circonstanciel »
+(terminologie 2020, par défaut) ou « sujet, prédicat, complément de phrase »,
+qui ajoute une étape où l'élève délimite le prédicat.
+
+Ce que l'application calcule elle-même, sans corrigé :
+- la **nature d'un groupe** (GN, groupe prépositionnel, groupe adjectival…)
+  et son **noyau**, d'après la nature de ses mots ;
+- l'**identité du verbe** (infinitif, mode, temps, personne, voix), d'après le
+  dictionnaire ; une forme ambiguë accepte toutes ses lectures ;
+- le **type de phrase** et les formes négative, passive et exclamative. Les
+  formes emphatique et impersonnelle reposent sur un test que l'élève fait
+  (en mode libre) ou sont indiquées dans le corrigé (en entraînement).
 
 ## Ajouter des phrases à la banque
 
@@ -67,12 +84,24 @@ ajouter une, copier un bloc existant :
 - Les mots hors crochets n'ont pas de fonction (ne… pas, et, ponctuation) :
   `[S Il] ne [V mange] pas.`
 - Un groupe coupé en deux porte le même numéro : `[V#1 As]-[S tu] [V#1 fini] ?`
+- La nature d'un groupe est calculée ; pour l'imposer, l'ajouter après une
+  barre oblique : `[CC:temps/GN Hier soir]` (`GN`, `GP`, `GAdj`, `GAdv`,
+  `GInf`, `PRO`, `SUB`).
 - `{TYPE …}` délimite une proposition, seulement pour les phrases
   complexes : `IND` indépendante, `PRINC` principale, `SUB-REL` relative,
   `SUB-CONJ` complétive, `SUB-CIRC` circonstancielle, `SUB-INT`
   interrogative indirecte, `SUB-INF` infinitive, `SUB-PART` participiale.
   Une subordonnée qui a une fonction s'écrit dans son groupe :
   `{PRINC [S Je] [V crois] [COD {SUB-CONJ que [S Léa] [V viendra]}]}.`
+
+### Type et formes, phrases réservées à un thème
+
+Le type et les formes de phrase sont calculés. Pour les imposer :
+`type: 'declaratif'` (ou `interrogatif`, `imperatif`) et
+`formes: ['negative', 'emphatique']` (`negative`, `passive`, `exclamative`,
+`emphatique`, `impersonnelle`). Une phrase qui ne sert qu'à un thème porte
+`seulement: ['phrase']` : son analyse peut alors se réduire au texte
+(exemple : « C'est mon frère qui a gagné la course. », forme emphatique).
 
 ### La ligne `natures`
 
@@ -123,7 +152,7 @@ puis ouvrir http://localhost:8000.
 | Dossier | Contenu |
 | --- | --- |
 | `js/data/` | Terminologie, mots grammaticaux, fiches méthode, banque de phrases |
-| `js/core/` | Logique sans interface : découpage, lecture des corrigés, dictionnaire, manipulations, correction (`exercice.js`), guide du mode libre (`guide.js`) |
+| `js/core/` | Logique sans interface : découpage, lecture des corrigés, dictionnaire, manipulations, correction (`exercice.js`), guide du mode libre (`guide.js`), nature des groupes (`groupes.js`), identité du verbe (`verbe.js`), type et formes (`phrase.js`) |
 | `js/ui/` | Écrans : entraînement, analyse libre, aide-mémoire |
 | `data/lexique.json` | Dictionnaire compact, produit par `outils/construire_lexique.py` |
 | `tests/` | Tests (`npm test`, Node 20 ou plus) |

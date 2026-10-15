@@ -206,3 +206,30 @@ export const memoire = {
   lit(cle, defaut) { try { return localStorage.getItem(cle) ?? defaut; } catch { return defaut; } },
   ecrit(cle, valeur) { try { localStorage.setItem(cle, valeur); } catch { /* sans stockage */ } },
 };
+
+// Réglages de l'enseignant (mémorisés sur l'appareil).
+export const reglages = {
+  get vocabulaire() { return memoire.lit('vocabulaire', 'gv'); },
+  set vocabulaire(v) { memoire.ecrit('vocabulaire', v); },
+};
+
+// Boutons à cocher (plusieurs choix possibles) avec un bouton de validation.
+export function choixMultiple(titre, options, surValidation, { libelleValider = 'Valider', aucun = null } = {}) {
+  const coches = new Set();
+  const boutons = options.map((o) => {
+    const b = el('button', {
+      type: 'button', class: 'bouton bouton-choix', 'aria-pressed': 'false', title: o.definition ?? null,
+      onclick: () => {
+        if (coches.has(o.code)) coches.delete(o.code); else coches.add(o.code);
+        b.setAttribute('aria-pressed', coches.has(o.code) ? 'true' : 'false');
+      },
+    }, o.nom);
+    return b;
+  });
+  return el('div', { class: 'choix' },
+    titre ? el('p', { class: 'choix-titre' }, titre) : null,
+    el('div', { class: 'choix-liste colonnes' }, boutons),
+    el('div', { class: 'rangee' },
+      el('button', { type: 'button', class: 'bouton bouton-principal', onclick: () => surValidation([...coches]) }, libelleValider),
+      aucun ? el('button', { type: 'button', class: 'bouton bouton-secondaire', onclick: () => surValidation([]) }, aucun) : null));
+}

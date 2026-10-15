@@ -1,13 +1,19 @@
 // Mode « Analyser ma phrase » : l'élève tape n'importe quelle phrase et
 // l'application le guide, test après test, sans connaître la réponse.
 
-import { FONCTIONS, NATURES, CIRCONSTANCES, natureAuNiveau, naturesProposees } from '../data/terminologie.js';
+import {
+  FONCTIONS, NATURES, CIRCONSTANCES, GROUPES, TYPES_PHRASE, FORMES_PHRASE, natureAuNiveau, naturesProposees,
+} from '../data/terminologie.js';
 import { METHODES } from '../data/methodes.js';
 import { decoupe, normalise, recompose } from '../core/decoupage.js';
 import { chargeLexique, estMotCompose, formesConjuguees, naturesPossibles } from '../core/lexique.js';
 import * as G from '../core/guide.js';
 import * as M from '../core/manipulations.js';
-import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, etapes, memoire } from './composants.js';
+import { natureGroupe, noyauADemander } from '../core/groupes.js';
+import { identiteVerbe, libelleTemps, libellePersonne } from '../core/verbe.js';
+import { typeEtFormes, formePassive } from '../core/phrase.js';
+import { demandeIdentite } from './questions.js';
+import { el, vide, remplit, PhraseInteractive, PanneauAide, bulle, choix, choixMultiple, etapes, memoire, reglages } from './composants.js';
 
 const EXEMPLES = [
   'Le chat de la voisine dort sur le canapé.',
@@ -59,10 +65,14 @@ class Analyse {
     this.groupes = [];
     this.expansions = [];
     this.natures = [];
+    this.naturesGroupes = new Map();
+    this.identites = [];
+    this.typeFormes = null;
   }
 
   get nomsEtapes() {
-    return ['Verbes', ...(this.verbes.length > 1 ? ['Propositions'] : []), 'Sujets', 'Compléments', 'Groupe nominal', 'Natures'];
+    return ['Verbes', ...(this.verbes.length > 1 ? ['Propositions'] : []), 'Sujets', 'Compléments', 'Groupe nominal',
+      'Nature des groupes', 'Identité du verbe', 'Natures', 'Type et formes'];
   }
 
   demarre() {
@@ -388,7 +398,7 @@ class Analyse {
     this.boutons(
       this.bouton('Tester ce groupe', analyser, 'principal', { selection: true }),
       this.bouton('Effacer', () => this.phrase.efface(), 'secondaire'),
-      this.bouton('J’ai fini →', () => this.etapeNatures(0), 'lien'),
+      this.bouton('J’ai fini →', () => this.etapeGroupes(0), 'lien'),
     );
   }
 
@@ -396,7 +406,7 @@ class Analyse {
 
   etapeNatures(k) {
     this.unites ??= G.unitesNatures(this.jetons, this.verbes);
-    if (k >= this.unites.length) return this.bilan();
+    if (k >= this.unites.length) return this.etapePhrase();
     const u = this.unites[k];
     const cand = G.candidatsNature(this.jetons, u);
     const auNiv = (code) => natureAuNiveau(code, this.niveau);
@@ -419,7 +429,7 @@ class Analyse {
     };
     const toutes = naturesProposees(this.niveau).flatMap((g) => (g.sous.length ? g.sous : [{ code: g.code, nom: g.nom }]));
     const montreToutes = () => remplit(this.actions, choix('Toutes les natures :', toutes, (o) => choisit(o.code), { colonnes: true }), passer);
-    const passer = el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.bilan() }, 'Passer au bilan');
+    const passer = el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.etapePhrase() }, 'Passer l’étape →');
     if (possibles.length) {
       remplit(this.actions, 
         choix('Natures possibles d’après le dictionnaire :', possibles.map((p) => ({ code: p, nom: NATURES[p]?.nom ?? p })), (o) => choisit(o.code), { colonnes: true }),
@@ -427,6 +437,141 @@ class Analyse {
         passer,
       );
     } else montreToutes();
+  }
+
+
+  // --- 6. Nature et noyau des groupes ----------------------------------------------------
+
+  // Tous les groupes analysés, dans l'ordre de la phrase.
+  groupesAnalyses() {
+    return [
+      ...this.sujets.map((s, k) => (s ? { jetons: s, nom: 'sujet', verbe: k, fonction: 'S' } : null)).filter(Boolean),
+      ...this.groupes,
+      ...this.expansions,
+    ].filter((g) => !['MOD', 'CONN'].includes(g.fonction)).sort((a, b) => a.jetons[0] - b.jetons[0]);
+  }
+
+  // Nature probable de chaque mot : verbes repérés, locutions, dictionnaire.
+  natureProbable(i) {
+    if (this.verbes.some((v) => v.includes(i))) return 'verbe';
+    this.unites ??= G.unitesNatures(this.jetons, this.verbes);
+    const u = this.unites.find((x) => x.jetons.includes(i));
+    if (u?.locution) return u.locution;
+    return G.candidatsNature(this.jetons, { jetons: [i], locution: null }).probable;
+  }
+
+  etapeGroupes(k) {
+    const groupes = this.groupesAnalyses();
+    if (k >= groupes.length) return this.etapeIdentite(0);
+    const g = groupes[k];
+    const t = recompose(g.jetons.map((i) => this.jetons[i]));
+    const proposition = this.verbes.some((v) => v.every((i) => g.jetons.includes(i)));
+    const calcul = natureGroupe(this.jetons, g.jetons, (i) => this.natureProbable(i), { proposition, fonction: g.fonction });
+    this.ouvre('Nature des groupes', `Quelle est la nature du groupe « ${t} » (${g.nom}) ? (${k + 1} / ${groupes.length})`, [
+      'Regarde le premier mot du groupe, puis cherche le mot autour duquel il est construit.',
+      ...Object.values(GROUPES).map((x) => `${x.nom} : ${x.aide}`),
+    ]);
+    this.phrase.active(false);
+    this.phrase.surligner(g.jetons);
+    const cle = g.jetons.join();
+    const suite = (code) => {
+      this.naturesGroupes.set(cle, { code, noyau: null });
+      if (code === calcul?.code && noyauADemander(calcul, g.jetons, this.jetons)) return this.demandeNoyau(k, g, t, calcul);
+      this.etapeGroupes(k + 1);
+    };
+    remplit(this.actions, choix(null, Object.entries(GROUPES).map(([code, x]) => ({ code, nom: x.nom, definition: x.aide })), (o) => {
+      if (!calcul || o.code === calcul.code) {
+        if (calcul) remplit(this.retour, bulle('juste', calcul.raison));
+        return suite(o.code);
+      }
+      remplit(this.retour, bulle('attention', `${calcul.raison} Ce n’est donc sans doute pas : ${GROUPES[o.code].nom.toLowerCase()}.`));
+      this.boutons(this.bouton('Changer', () => this.etapeGroupes(k)), this.bouton('Je garde mon choix', () => suite(o.code), 'secondaire'));
+    }, { colonnes: true }), el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.etapeIdentite(0) }, 'Passer l’étape →'));
+  }
+
+  demandeNoyau(k, g, t, calcul) {
+    this.consigne.textContent = `Quel est le noyau du groupe « ${t} » ? Touche-le.`;
+    this.phrase.active(true);
+    this.phrase.efface();
+    const valider = () => {
+      const sel = this.phrase.valeur();
+      if (sel.length !== 1 || !g.jetons.includes(sel[0])) return remplit(this.retour, bulle('faux', 'Le noyau est un seul mot du groupe surligné.'));
+      const enregistre = () => { this.naturesGroupes.get(g.jetons.join()).noyau = sel[0]; this.etapeGroupes(k + 1); };
+      if (sel[0] === calcul.noyau) return enregistre();
+      remplit(this.retour, bulle('attention', `Le noyau est sans doute « ${this.jetons[calcul.noyau].texte} » : c’est le mot qu’on ne peut pas supprimer, celui qui donne sa nature au groupe${calcul.code === 'GP' ? ' (dans un groupe prépositionnel, le mot introduit par la préposition)' : ''}.`));
+      this.boutons(this.bouton('Changer', () => this.demandeNoyau(k, g, t, calcul)), this.bouton('Je garde mon choix', enregistre, 'secondaire'));
+    };
+    this.boutons(this.bouton('Valider', valider, 'principal', { selection: true }));
+  }
+
+  // --- 7. Identité du verbe -----------------------------------------------------------------
+
+  etapeIdentite(k) {
+    if (k >= this.verbes.length) return this.etapeNatures(0);
+    const verbe = this.verbes[k];
+    const v = M.texteVerbe(this.jetons, verbe);
+    this.ouvre('Identité du verbe', '', [
+      'Pour trouver l’infinitif, mets le verbe après « il faut » ; pour un temps composé, prends le participe passé.',
+      'Un verbe en deux mots (auxiliaire + participe passé) est à un temps composé : le temps de l’auxiliaire donne le temps composé (présent → passé composé, imparfait → plus-que-parfait…).',
+      'Pour la personne, remplace le sujet par un pronom personnel (je, tu, il, nous, vous, ils).',
+    ]);
+    this.phrase.active(false);
+    this.phrase.surligner(verbe);
+    const sujet = this.sujets[k] === null ? null : (this.sujets[k] ? G.traitsSujet(this.jetons, this.sujets[k]) ?? { personne: 3, nombre: null } : undefined);
+    // Un participe déclaré attribut (« je suis égarée ») n'est pas dans le verbe.
+    const passif = formePassive(this.jetons, verbe);
+    const id = identiteVerbe(this.jetons, verbe, { sujet, passif });
+    if (!id || !id.possibilites.length || !id.infinitifs.length) {
+      this.consigne.textContent = `Identité du verbe « ${v} »`;
+      remplit(this.retour, bulle('info', `Le dictionnaire ne connaît pas la forme « ${v} » : il ne peut pas vérifier ta réponse. Cherche son infinitif, son mode et son temps dans un tableau de conjugaison.`));
+      return this.boutons(this.bouton('Continuer →', () => this.etapeIdentite(k + 1)));
+    }
+    const affiche = (r) => remplit(this.retour, bulle(r.statut, r.message));
+    demandeIdentite(this, id, v, this.niveau, affiche, (r, rep) => {
+      this.identites[k] = { ...rep, infinitif: id.infinitifs[0], voix: id.voix };
+      remplit(this.retour, bulle('juste', r.message));
+      this.phrase.active(false);
+      this.boutons(this.bouton('Continuer →', () => this.etapeIdentite(k + 1)));
+    });
+  }
+
+  // --- 9. Type et formes de phrase ---------------------------------------------------------------
+
+  etapePhrase() {
+    const tous = this.jetons.filter((j) => !j.ponct).map((j) => j.i);
+    const props = this.verbes.map((v, k) => {
+      const jetons = this.propositions?.[k] ?? tous;
+      const premier = this.jetons[Math.min(...jetons)];
+      return {
+        jetons, verbe: v, sujet: this.sujets[k] === null ? null : this.sujets[k] ?? [],
+        subordonnee: this.verbes.length > 1 && G.estSubordonnant(premier),
+        passif: formePassive(this.jetons, v),
+      };
+    });
+    const calcul = typeEtFormes(this.jetons, props, this.niveau);
+    this.ouvre('Type et formes', 'De quel type est ta phrase ?', [
+      ...Object.values(TYPES_PHRASE).map((x) => `${x.nom} : ${x.aide}`),
+      ...Object.keys(calcul.formes).map((f) => `Forme ${FORMES_PHRASE[f].nom.toLowerCase()} : ${FORMES_PHRASE[f].aide}`),
+    ]);
+    this.phrase.active(false);
+    const choisitType = (type) => {
+      const formes = Object.keys(calcul.formes);
+      this.consigne.textContent = 'Quelles sont ses formes ? Coche toutes celles qui conviennent.';
+      remplit(this.actions, choixMultiple(null, formes.map((f) => ({ code: f, nom: FORMES_PHRASE[f].nom, definition: FORMES_PHRASE[f].aide })), (choisies) => {
+        // Formes vérifiables (négation, passif, point d'exclamation) ; les autres
+        // (emphatique, impersonnelle) dépendent d'un test que l'élève a fait.
+        const ecarts = formes.filter((f) => calcul.formes[f] !== null && calcul.formes[f] !== choisies.includes(f));
+        const enregistre = () => { this.typeFormes = { type, formes: choisies }; this.bilan(); };
+        if (!ecarts.length) return enregistre();
+        remplit(this.retour, ...ecarts.map((f) => bulle('attention', `Forme ${FORMES_PHRASE[f].nom.toLowerCase()} : ${calcul.raisons[f]}`)));
+        this.boutons(this.bouton('Changer', () => choisitType(type)), this.bouton('Je garde mon choix', enregistre, 'secondaire'));
+      }, { aucun: 'Aucune (phrase de base)' }));
+    };
+    remplit(this.actions, choix(null, Object.entries(TYPES_PHRASE).map(([code, x]) => ({ code, nom: x.nom, definition: x.aide })), (o) => {
+      if (o.code === calcul.type) { remplit(this.retour, bulle('juste', calcul.raisons.type)); return choisitType(o.code); }
+      remplit(this.retour, bulle('attention', `${calcul.raisons.type} Es-tu sûr·e du type ${TYPES_PHRASE[o.code].nom.toLowerCase()} ?`));
+      this.boutons(this.bouton('Changer', () => this.etapePhrase()), this.bouton('Je garde mon choix', () => choisitType(o.code), 'secondaire'));
+    }), el('button', { type: 'button', class: 'bouton bouton-lien', onclick: () => this.bilan() }, 'Passer l’étape →'));
   }
 
   // --- Bilan -----------------------------------------------------------------------------------
@@ -447,15 +592,22 @@ class Analyse {
         { jetons: v, nom: 'Verbe conjugué', raisons: [] },
         ...this.groupes.filter((g) => g.verbe === k),
       ].sort((a, b) => a.jetons[0] - b.jetons[0]);
-      for (const g of groupes) lignes.push(el('tr', {}, el('td', {}, t(g.jetons)), el('td', {}, majuscule(g.nom)), el('td', { class: 'petit' }, g.raisons.filter(Boolean).join(' '))));
+      for (const g of groupes) lignes.push(this.ligneBilan(t, g));
     });
-    for (const e of this.expansions) lignes.push(el('tr', {}, el('td', {}, t(e.jetons)), el('td', {}, majuscule(e.nom)), el('td', { class: 'petit' }, e.raisons.filter(Boolean).join(' '))));
+    for (const e of this.expansions) lignes.push(this.ligneBilan(t, e));
     const natures = this.natures.filter(Boolean);
-    remplit(this.retour, 
+    const identites = this.identites.map((id, k) => (id
+      ? el('li', {}, el('strong', {}, `« ${M.texteVerbe(this.jetons, this.verbes[k])} » : `), this.texteIdentite(id))
+      : null)).filter(Boolean);
+    const tf = this.typeFormes;
+    remplit(this.retour,
+      ...this.verbes.map((v, k) => this.structure(k)).filter(Boolean),
       lignes.length ? el('table', { class: 'tableau-bilan' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Groupe'), el('th', {}, 'Fonction'), el('th', {}, 'Pourquoi'))),
         el('tbody', {}, lignes)) : null,
       natures.length ? el('p', { class: 'natures-bilan' }, natures.map((u) => el('span', {}, el('strong', {}, u.texte), ` ${NATURES[u.nature]?.nom.toLowerCase() ?? u.nature}`))) : null,
+      identites.length ? el('ul', { class: 'petit' }, identites) : null,
+      tf ? el('p', { class: 'petit' }, this.texteTypeFormes(tf)) : null,
       bulle('info', 'Cette analyse repose sur tes réponses aux tests. Relis-la : si un test te semble douteux, recommence l’étape ou demande à ton professeur.'),
     );
     const texte = this.texteBilan(t, natures);
@@ -472,6 +624,39 @@ class Analyse {
     );
   }
 
+  ligneBilan(t, g) {
+    const n = this.naturesGroupes.get(g.jetons.join());
+    const nature = n ? ` — ${GROUPES[n.code].nom.toLowerCase()}${n.noyau != null ? `, noyau « ${this.jetons[n.noyau].texte} »` : ''}` : '';
+    return el('tr', {}, el('td', {}, t(g.jetons)), el('td', {}, majuscule(g.nom), nature ? el('small', {}, nature) : null),
+      el('td', { class: 'petit' }, (g.raisons ?? []).filter(Boolean).join(' ')));
+  }
+
+  texteIdentite(id) {
+    return `${id.infinitif}, ${libelleTemps(id.mode, id.temps).toLowerCase()}, ${libellePersonne(id.personne, id.nombre)}${id.voix === 'passive' ? ', voix passive' : ''}`;
+  }
+
+  texteTypeFormes(tf) {
+    const formes = tf.formes.map((f) => FORMES_PHRASE[f].nom.toLowerCase());
+    return `Phrase de type ${TYPES_PHRASE[tf.type].nom.toLowerCase()}${formes.length ? `, de forme ${formes.join(' et ')}` : ''}.`;
+  }
+
+  // Structure d'une proposition principale ou indépendante : sujet, groupe
+  // verbal (ou prédicat) et compléments circonstanciels (de phrase).
+  structure(k) {
+    const prop = this.propositions?.[k] ?? this.jetons.filter((j) => !j.ponct).map((j) => j.i);
+    if (this.verbes.length > 1 && G.estSubordonnant(this.jetons[Math.min(...prop)])) return null;
+    const predicat = reglages.vocabulaire === 'predicat';
+    const sujet = this.sujets[k] ?? [];
+    const cc = this.groupes.filter((g) => g.verbe === k && g.fonction === 'CC');
+    const hors = new Set([...sujet, ...this.groupes.filter((g) => g.verbe === k && ['CC', 'MOD', 'CONN'].includes(g.fonction)).flatMap((g) => g.jetons)]);
+    const gv = prop.filter((i) => !hors.has(i));
+    const bloc = (titre, ind) => (ind.length ? el('span', {}, el('strong', {}, titre), texteMorceaux(this.jetons, ind)) : null);
+    return el('p', { class: 'structure' },
+      bloc(predicat ? 'Sujet' : 'Groupe sujet', sujet),
+      bloc(predicat ? 'Prédicat' : 'Groupe verbal', gv),
+      ...cc.map((g) => bloc(predicat ? 'Complément de phrase' : 'Complément circonstanciel', g.jetons)));
+  }
+
   texteBilan(t, natures) {
     const l = [`Phrase : ${this.texte}`, ''];
     this.verbes.forEach((v, k) => {
@@ -481,6 +666,15 @@ class Analyse {
     });
     for (const e of this.expansions) l.push(`${majuscule(e.nom)} : ${t(e.jetons)}`);
     if (natures.length) l.push('', 'Natures :', ...natures.map((u) => `  ${u.texte} : ${NATURES[u.nature]?.nom.toLowerCase() ?? u.nature}`));
+    const groupes = this.groupesAnalyses().filter((g) => this.naturesGroupes.has(g.jetons.join()));
+    if (groupes.length) {
+      l.push('', 'Nature des groupes :', ...groupes.map((g) => {
+        const n = this.naturesGroupes.get(g.jetons.join());
+        return `  ${t(g.jetons)} : ${GROUPES[n.code].nom.toLowerCase()}${n.noyau != null ? ` (noyau : ${this.jetons[n.noyau].texte})` : ''}`;
+      }));
+    }
+    this.identites.forEach((id, k) => { if (id) l.push(`Verbe « ${M.texteVerbe(this.jetons, this.verbes[k])} » : ${this.texteIdentite(id)}`); });
+    if (this.typeFormes) l.push('', this.texteTypeFormes(this.typeFormes));
     return l.join('\n');
   }
 }

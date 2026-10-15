@@ -68,6 +68,12 @@ export const FONCTIONS = {
     nom: "Complément de l'adjectif", court: "Compl. de l'adjectif", abrege: 'Compl. adj.', niveau: 'c4', place: 'groupe', couleur: 'expansion',
     definition: "Le complément de l'adjectif complète un adjectif : un adverbe qui en précise le degré (« très grand », « totalement égarée ») ou un groupe introduit par une préposition (« fier de son travail »).",
   },
+  // Au cycle 3, on accepte l'étiquette générale avant de distinguer
+  // épithète, complément du nom, relative et apposition.
+  EXP: {
+    nom: 'Expansion du nom', court: 'Expansion du nom', abrege: 'Expansion', niveau: 'c3', place: 'expansion-generale', couleur: 'expansion',
+    definition: 'Une expansion du nom complète un nom : adjectif (un chat noir), groupe introduit par une préposition (le chat de la voisine), proposition relative (le chat qui dort). On peut la supprimer.',
+  },
   // Fonctions énonciatives et textuelles (terminologie II.2.7) : pas de
   // fonction syntaxique dans la phrase. Utilisées par le guide du mode libre.
   MOD: {
@@ -171,3 +177,41 @@ export function naturesProposees(niveau) {
 export const VERBES_ATTRIBUTIFS = [
   'être', 'sembler', 'paraître', 'devenir', 'rester', 'demeurer', 'redevenir',
 ];
+
+// Nature des groupes (terminologie I.3 et II.3). Le noyau est le mot autour
+// duquel le groupe est construit ; dans un groupe prépositionnel, c'est le
+// nom (ou le pronom, l'infinitif) du groupe introduit par la préposition.
+export const GROUPES = {
+  GN: { nom: 'Groupe nominal', abrege: 'GN', noyau: 'nom', aide: 'Il est construit autour d’un nom, souvent précédé d’un déterminant (le chat de la voisine). Un nom propre seul forme aussi un groupe nominal.' },
+  GP: { nom: 'Groupe prépositionnel', abrege: 'GP', noyau: 'nom, pronom ou infinitif après la préposition', aide: 'Il commence par une préposition (à, de, dans, pour…) suivie d’un groupe nominal, d’un pronom ou d’un infinitif.' },
+  GAdj: { nom: 'Groupe adjectival', abrege: 'GAdj', noyau: 'adjectif', aide: 'Il est construit autour d’un adjectif, parfois précédé d’un adverbe ou suivi d’un complément (très grand, fier de son travail).' },
+  GAdv: { nom: 'Adverbe ou groupe adverbial', abrege: 'GAdv', noyau: 'adverbe', aide: 'Il est construit autour d’un adverbe (vite, très vite, hier).' },
+  GInf: { nom: 'Groupe infinitif', abrege: 'GInf', noyau: 'verbe à l’infinitif', aide: 'Il est construit autour d’un verbe à l’infinitif (jouer du piano).' },
+  PRO: { nom: 'Pronom', abrege: 'Pronom', noyau: null, aide: 'Un pronom seul occupe la place d’un groupe nominal (il, le, lui, en…).' },
+  SUB: { nom: 'Proposition subordonnée', abrege: 'Subordonnée', noyau: null, aide: 'Elle contient un verbe conjugué et commence par un mot subordonnant (qui, que, quand…).' },
+};
+
+// Types et formes de phrase (terminologie I.2.4, I.2.5 et II.1.8).
+export const TYPES_PHRASE = {
+  declaratif: { nom: 'Déclaratif', aide: 'On affirme quelque chose (la phrase se termine souvent par un point).' },
+  interrogatif: { nom: 'Interrogatif', aide: 'On pose une question (point d’interrogation, inversion du sujet, « est-ce que »).' },
+  imperatif: { nom: 'Impératif', aide: 'On donne un ordre ou un conseil (verbe à l’impératif, sans sujet exprimé).' },
+};
+export const FORMES_PHRASE = {
+  negative: { nom: 'Négative', niveau: 'c3', aide: 'La phrase contient une négation (ne… pas, ne… jamais, ne… plus, ne… rien…).' },
+  passive: { nom: 'Passive', niveau: 'c3', aide: 'Le sujet subit l’action ; on peut retourner la phrase à la voix active (« La souris est attrapée par le chat » → « Le chat attrape la souris »).' },
+  exclamative: { nom: 'Exclamative', niveau: 'c3', aide: 'La phrase exprime un sentiment (point d’exclamation, « quel », « que », « comme »).' },
+  emphatique: { nom: 'Emphatique', niveau: 'c4', aide: 'Un constituant est mis en relief par « c’est… qui / que » ou détaché en tête avec une reprise (« Ton frère, il est parti »).' },
+  impersonnelle: { nom: 'Impersonnelle', niveau: 'lycee', aide: 'Le verbe principal a pour sujet un « il » qui ne désigne rien, et la phrase équivaut à une phrase personnelle (« Il est arrivé un accident » = « Un accident est arrivé »). « Il pleut » n’est pas de forme impersonnelle.' },
+};
+
+// Temps proposés pour l'identité du verbe.
+export const TEMPS_VERBAUX = {
+  ind: {
+    nom: 'Indicatif', niveau: 'c3',
+    temps: { pre: 'Présent', imp: 'Imparfait', pas: 'Passé simple', fut: 'Futur simple', pc: 'Passé composé', pqp: 'Plus-que-parfait', pa: 'Passé antérieur', fa: 'Futur antérieur' },
+  },
+  cnd: { nom: 'Conditionnel', niveau: 'c3', temps: { pre: 'Présent', cp: 'Passé' } },
+  sub: { nom: 'Subjonctif', niveau: 'c4', temps: { pre: 'Présent', imp: 'Imparfait', sp: 'Passé', spqp: 'Plus-que-parfait' } },
+  imp: { nom: 'Impératif', niveau: 'c3', temps: { pre: 'Présent', ip: 'Passé' } },
+};

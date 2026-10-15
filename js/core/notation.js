@@ -12,7 +12,7 @@
 // - Les mots hors crochets n'ont pas de fonction (ne… pas, et, ponctuation).
 
 import { decoupe, normalise } from './decoupage.js';
-import { FONCTIONS, PROPOSITIONS } from '../data/terminologie.js';
+import { FONCTIONS, PROPOSITIONS, GROUPES } from '../data/terminologie.js';
 
 export function litNotation(notation, estMotCompose) {
   let texte = '';
@@ -58,7 +58,10 @@ export function litNotation(notation, estMotCompose) {
 }
 
 function analyseEtiquette(etiquette, genre) {
-  const [base, lien] = etiquette.split('#');
+  // [CC:temps/GN#1 …] : fonction, précision, nature du groupe, lien.
+  const [avantLien, lien] = etiquette.split('#');
+  const [base, natureGroupe] = avantLien.split('/');
+  if (natureGroupe && !GROUPES[natureGroupe]) throw new Error(`Nature de groupe inconnue : ${natureGroupe}`);
   const [fonction, precision] = base.split(':');
   if (genre === 'proposition' && !PROPOSITIONS[fonction]) {
     throw new Error(`Type de proposition inconnu : ${fonction}`);
@@ -66,7 +69,7 @@ function analyseEtiquette(etiquette, genre) {
   if (genre === 'groupe' && !FONCTIONS[fonction]) {
     throw new Error(`Fonction inconnue : ${fonction}`);
   }
-  return { genre, etiquette, fonction, precision: precision ?? null, lien: lien ?? null };
+  return { genre, etiquette, fonction, precision: precision ?? null, lien: lien ?? null, natureGroupe: natureGroupe ?? null };
 }
 
 // [V#1 a] … [V#1 mangé] ne forment qu'un seul groupe.
@@ -146,6 +149,9 @@ export function construitCorrige(entree, estMotCompose) {
     expansions,
     natures: litNatures(entree.natures, jetons),
     note: entree.note ?? null,
+    // Type et formes imposés par l'auteur (sinon calculés).
+    type: entree.type ?? null,
+    formes: entree.formes ?? null,
   };
 }
 

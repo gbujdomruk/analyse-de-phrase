@@ -4,7 +4,7 @@ import { NIVEAUX } from './data/terminologie.js';
 import { ecranThemes, ecranExercice } from './ui/entrainement.js';
 import { ecranSaisie } from './ui/libre.js';
 import { ecranFiches } from './ui/fiches.js';
-import { el, remplit, memoire } from './ui/composants.js';
+import { el, remplit, memoire, reglages } from './ui/composants.js';
 
 const racine = document.getElementById('app');
 const choixNiveau = document.getElementById('niveau');
@@ -39,6 +39,21 @@ function accueil() {
   );
 }
 
+function ecranReglages() {
+  const option = (valeur, titre, detail) => el('label', { class: 'option-reglage' },
+    el('input', { type: 'radio', name: 'vocabulaire', value: valeur, checked: reglages.vocabulaire === valeur || null,
+      onchange: () => { reglages.vocabulaire = valeur; } }),
+    el('span', {}, el('strong', {}, titre), el('small', {}, detail)));
+  remplit(racine,
+    el('h1', {}, 'Réglages'),
+    el('p', { class: 'intro' }, 'Ces réglages sont mémorisés sur cet appareil. Le niveau se choisit aussi en haut de l’écran.'),
+    el('fieldset', { class: 'reglage' },
+      el('legend', {}, 'Vocabulaire de la phrase'),
+      option('gv', 'Groupe sujet, groupe verbal, complément circonstanciel', 'Vocabulaire recommandé par la terminologie grammaticale de 2020.'),
+      option('predicat', 'Sujet, prédicat, complément de phrase', 'Ajoute une étape « prédicat » : ce que l’on dit du sujet (le verbe et ses compléments).')),
+  );
+}
+
 function route() {
   const [, ecran, param] = location.hash.split('/');
   window.scrollTo(0, 0);
@@ -46,6 +61,7 @@ function route() {
   if (ecran === 'entrainement') return ecranThemes(racine, niveau);
   if (ecran === 'libre') return ecranSaisie(racine, niveau);
   if (ecran === 'fiches') return ecranFiches(racine, niveau);
+  if (ecran === 'reglages') return ecranReglages();
   return accueil();
 }
 
