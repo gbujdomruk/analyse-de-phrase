@@ -67,3 +67,8 @@ function route() {
 
 window.addEventListener('hashchange', route);
 route();
+
+// Application installable : mise en cache pour fonctionner hors connexion.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* pas de cache, l'application marche quand même */ });
+}

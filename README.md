@@ -147,6 +147,19 @@ puis ouvrir http://localhost:8000.
 3. Le site est en ligne quelques minutes plus tard à l'adresse
    `https://<compte>.github.io/<dépôt>/`.
 
+## Installer sur un téléphone
+
+L'application est installable (manifeste et cache hors connexion) :
+- **iPhone / iPad** : ouvrir le lien dans **Safari**, bouton Partager, puis
+  « Sur l'écran d'accueil ».
+- **Android** : ouvrir le lien dans **Chrome**, menu ⋮, puis « Installer
+  l'application » (ou « Ajouter à l'écran d'accueil »).
+
+Une fois ouverte une première fois, elle fonctionne sans connexion. Quand
+une nouvelle version est publiée, elle est prise en compte à l'ouverture
+suivante avec du réseau. Si un fichier JavaScript est ajouté, il faut aussi
+l'ajouter à la liste de `sw.js` (un test le vérifie).
+
 ## Organisation du code
 
 | Dossier | Contenu |
