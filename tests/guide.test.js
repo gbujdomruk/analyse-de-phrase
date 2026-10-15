@@ -190,3 +190,18 @@ test('groupe prépositionnel introduit par « au » : message sur la contraction
   assert.match(E.verifieNoyau(c, item, 2).message, /introduit le groupe : ce n’est pas le noyau/);
   assert.equal(E.verifieNoyau(c, item, 3).statut, 'juste');
 });
+
+test('« Il faut que tu partes » : verbe impersonnel, pas de forme impersonnelle', async () => {
+  const { PHRASES } = await import('../js/data/phrases.js');
+  const { construitCorrige } = await import('../js/core/notation.js');
+  const { estMotCompose } = await import('../js/core/lexique.js');
+  const E = await import('../js/core/exercice.js');
+  const c = construitCorrige(PHRASES.find((p) => p.id === 'faut-partes'), estMotCompose);
+  const item = E.creeExercice(c, 'phrase', 'lycee').etapes[0].items[0];
+  assert.equal(item.attendu.formes.impersonnelle, false);
+  const ok = E.verifieFormes(item, []);
+  assert.match(ok.message, /ni impersonnelle/);
+  assert.match(ok.message, /forme « affirmative »/);
+  assert.match(ok.message, /« faut » est impersonnel/);
+  assert.match(E.verifieFormes(item, ['impersonnelle']).message, /aucune phrase personnelle ne lui correspond/);
+});

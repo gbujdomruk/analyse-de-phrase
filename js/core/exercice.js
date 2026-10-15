@@ -664,9 +664,14 @@ export function verifieFormes(item, choisies) {
   const enTrop = choisies.filter((f) => !attendues.includes(f));
   const manquantes = attendues.filter((f) => !choisies.includes(f));
   if (!enTrop.length && !manquantes.length) {
-    return juste(attendues.length
+    // On nomme toutes les formes du niveau, et on rappelle qu'il n'existe pas
+    // de « forme affirmative » ni de « forme active » (terminologie I.2.5).
+    const possibles = Object.keys(a.formes).map((f) => FORMES_PHRASE[f].nom.toLowerCase());
+    const ni = possibles.map((f) => `ni ${f}`).join(', ');
+    const message = attendues.length
       ? `Oui : forme${attendues.length > 1 ? 's' : ''} ${attendues.map((f) => FORMES_PHRASE[f].nom.toLowerCase()).join(' et ')}.`
-      : 'Oui : aucune forme particulière, c’est la phrase de base (ni négative, ni passive, ni exclamative).');
+      : `Oui : aucune forme particulière (${ni}). C’est la phrase de base : on ne parle pas de forme « affirmative » ni « active ».`;
+    return juste(a.raisons.verbeImpersonnel ? `${message} ${a.raisons.verbeImpersonnel}` : message);
   }
   if (enTrop.length) return faux(`La phrase n’est pas de forme ${FORMES_PHRASE[enTrop[0]].nom.toLowerCase()}. ${a.raisons[enTrop[0]] ?? ''}`);
   return faux(`Il manque une forme. ${FORMES_PHRASE[manquantes[0]].aide}`);

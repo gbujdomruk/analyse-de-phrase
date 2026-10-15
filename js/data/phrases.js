@@ -336,7 +336,7 @@ export const PHRASES = [
     themes: ['propositions', 'complements'],
     analyse: '{PRINC [S Il] [V faut] [CVI {SUB-CONJ que [S tu] [V partes]}]}.',
     natures: 'pro.pers verbe conj.sub pro.pers verbe',
-    note: '« Il » est un sujet impersonnel : il ne désigne rien.',
+    note: '« Il » est un sujet impersonnel : il ne désigne rien. Le verbe « falloir » est à la voix impersonnelle, mais la phrase n’est pas de forme impersonnelle, car aucune phrase personnelle ne lui correspond (terminologie 2020, II.1.8.5).',
   },
   {
     id: 'oiseaux-chanter',

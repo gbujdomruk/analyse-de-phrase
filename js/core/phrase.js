@@ -8,6 +8,8 @@ import { lemmesVerbaux, formesNonConjuguees } from './lexique.js';
 import { normalise } from './decoupage.js';
 
 const NEGATION = new Set(['ne', "n'"]);
+// Verbes qui n'existent qu'avec un « il » impersonnel (il faut, il pleut).
+const VERBES_IMPERSONNELS = new Set(['falloir', 'pleuvoir', 'neiger', 'grêler', 'venter', 'bruiner', 'brumer']);
 const REFLECHIS = new Set(['me', "m'", 'te', "t'", 'se', "s'", 'nous', 'vous']);
 
 // « être » + participe passé d'un verbe qui ne se conjugue pas avec « être ».
@@ -56,6 +58,16 @@ export function typeEtFormes(jetons, propositions, niveau = 'lycee') {
 
   formes.impersonnelle = null;
   raisons.impersonnelle = 'Le sujet est-il un « il » qui ne désigne rien, et peut-on retourner la phrase avec un autre sujet (« Il est arrivé un accident » → « Un accident est arrivé ») ?';
+  // « Il faut », « il pleut » : verbe à la voix impersonnelle, mais pas de
+  // phrase personnelle correspondante, donc pas de forme impersonnelle.
+  const impersonnel = principales.find((p) => p.sujet?.length === 1 && normalise(jetons[p.sujet[0]].texte) === 'il'
+    && lemmesVerbaux(jetons[p.verbe.at(-1)].texte).some((l) => VERBES_IMPERSONNELS.has(l)));
+  if (impersonnel) {
+    const v = jetons[impersonnel.verbe.at(-1)].texte;
+    formes.impersonnelle = false;
+    raisons.impersonnelle = `Le verbe « ${v} » est impersonnel (« il » ne désigne rien), mais la phrase n’est pas de forme impersonnelle : aucune phrase personnelle ne lui correspond. La terminologie parle alors d’une phrase « comportant un verbe à la voix impersonnelle ».`;
+    raisons.verbeImpersonnel = raisons.impersonnelle;
+  }
 
   // On ne garde que les formes au programme du niveau.
   for (const f of Object.keys(formes)) if (!auNiveau(FORMES_PHRASE[f].niveau, niveau)) delete formes[f];
